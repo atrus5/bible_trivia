@@ -1,0 +1,231 @@
+/* Bible Trivia — shared theme */
+:root {
+  --bg: #0f1220;
+  --panel: #1a1f36;
+  --panel-2: #232a4d;
+  --line: rgba(255, 255, 255, 0.08);
+  --gold: #f5b942;
+  --gold-2: #ffd97a;
+  --purple: #7c5cff;
+  --green: #2ecc71;
+  --red: #ff5252;
+  --text: #f2f3fb;
+  --muted: #9aa0c3;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(1200px 600px at 85% -10%, rgba(124, 92, 255, 0.25), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(245, 185, 66, 0.15), transparent 55%),
+    var(--bg);
+}
+
+h1, h2, h3 { margin: 0 0 12px; }
+h1 { font-size: 28px; }
+a { color: var(--gold-2); }
+
+.card {
+  background: linear-gradient(180deg, var(--panel), rgba(26, 31, 54, 0.7));
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+.btn {
+  display: inline-block;
+  padding: 12px 18px;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(135deg, var(--purple), #5a3fd6);
+  transition: transform 0.06s ease, filter 0.15s ease;
+}
+.btn:hover { filter: brightness(1.15); }
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; filter: none; }
+.btn.gold { background: linear-gradient(135deg, var(--gold), #d99a1b); color: #241a03; }
+.btn.green { background: linear-gradient(135deg, var(--green), #1e9e56); }
+.btn.red { background: linear-gradient(135deg, var(--red), #c62828); }
+.btn.ghost {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+
+input[type="text"], input[type="password"], select {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 15px;
+  outline: none;
+}
+input:focus, select:focus { border-color: var(--purple); }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(15, 18, 32, 0.8);
+  position: sticky;
+  top: 0;
+  backdrop-filter: blur(8px);
+  z-index: 10;
+}
+.brand {
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  font-size: 20px;
+  background: linear-gradient(90deg, var(--gold-2), var(--gold), var(--purple));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  white-space: nowrap;
+}
+.brand small { font-size: 11px; color: var(--muted); -webkit-text-fill-color: var(--muted); }
+.nav { display: flex; gap: 10px; flex-wrap: wrap; }
+.nav a {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 13px;
+}
+.nav a:hover, .nav a.active { background: var(--panel-2); border-color: var(--purple); }
+
+.pill {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.pill.easy   { background: rgba(46, 204, 113, 0.18); color: #7bedaa; }
+.pill.medium { background: rgba(245, 185, 66, 0.18); color: var(--gold-2); }
+.pill.hard   { background: rgba(255, 82, 82, 0.2); color: #ff9d9d; }
+
+/* Answer option buttons/cards */
+.option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  margin: 10px 0;
+  font-size: 16px;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-2);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.option:hover:not(:disabled) { border-color: var(--purple); }
+.option:disabled { cursor: default; }
+.option .key {
+  display: inline-flex;
+  width: 26px; height: 26px;
+  margin-right: 12px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(124, 92, 255, 0.25);
+  font-weight: 700;
+  font-size: 13px;
+}
+.option.correct {
+  border-color: var(--green);
+  background: rgba(46, 204, 113, 0.18);
+  box-shadow: 0 0 0 2px rgba(46, 204, 113, 0.35), 0 0 24px rgba(46, 204, 113, 0.25);
+}
+.option.wrong {
+  border-color: var(--red);
+  background: rgba(255, 82, 82, 0.12);
+  opacity: 0.75;
+}
+.option.dim { opacity: 0.45; }
+
+/* Leaderboard table */
+table.board {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+}
+table.board th, table.board td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+table.board th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+table.board tr.me td { background: rgba(124, 92, 255, 0.12); }
+.rank {
+  display: inline-flex;
+  width: 30px; height: 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--panel-2);
+  font-weight: 700;
+}
+tr:first-child .rank { background: linear-gradient(135deg, var(--gold), #d99a1b); color: #241a03; }
+
+.crown-banner {
+  display: none;
+  text-align: center;
+  padding: 26px 20px;
+  border-radius: 16px;
+  border: 1px solid rgba(245, 185, 66, 0.45);
+  background: linear-gradient(135deg, rgba(245, 185, 66, 0.16), rgba(124, 92, 255, 0.14));
+  margin-bottom: 20px;
+}
+.crown-banner .name { font-size: 30px; font-weight: 800; color: var(--gold-2); }
+.crown-banner .pts { color: var(--muted); margin-top: 4px; }
+.crown-banner.show { display: block; animation: pop 0.5s ease; }
+
+@keyframes pop {
+  0% { transform: scale(0.9); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 800px) { .grid-2 { grid-template-columns: 1fr; } }
+
+.muted { color: var(--muted); }
+.feedback { margin-top: 14px; font-weight: 700; min-height: 24px; }
+.feedback.good { color: #7bedaa; }
+.feedback.bad { color: #ff9d9d; }
+
+/* Timer ring */
+.timer-wrap { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.timer-bar {
+  flex: 1;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  overflow: hidden;
+}
+.timer-fill {
+  height: 100%;
+  width: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--green), var(--gold));
+  transition: width 1s linear, background 0.4s ease;
+}
+.timer-fill.warn { background: linear-gradient(90deg, var(--gold), var(--red)); }
+.timer-num { font-weight: 800; font-size: 20px; min-width: 44px; text-align: right; }

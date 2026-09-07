@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bible Trivia — Leaderboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        .wrap { max-width: 900px; margin: 24px auto; padding: 0 16px; }
+        .podium { display: flex; align-items: flex-end; justify-content: center; gap: 14px; margin: 18px 0 26px; }
+        .podium .slot {
+            flex: 1;
+            max-width: 180px;
+            text-align: center;
+            background: var(--panel-2);
+            border: 1px solid var(--line);
+            border-radius: 14px 14px 0 0;
+            padding: 14px 10px 10px;
+        }
+        .podium .slot .nm { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .podium .slot .pt { color: var(--gold-2); font-weight: 800; }
+        .podium .p1 { min-height: 130px; border-color: rgba(245, 185, 66, 0.5); order: 2; }
+        .podium .p2 { min-height: 95px; order: 1; }
+        .podium .p3 { min-height: 75px; order: 3; }
+        .podium .p1 { background: linear-gradient(180deg, rgba(245, 185, 66, 0.25), var(--panel-2)); }
+        .medal { font-size: 34px; }
+        @media (max-width: 560px) { .podium { gap: 8px; } .podium .slot { min-height: 90px !important; } }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <div class="brand">🏆 Bible Trivia</div>
+        <div class="nav">
+            <a href="/">Play</a>
+            <a href="/leaderboard" class="active">Leaderboard</a>
+            <a href="/admin">Admin</a>
+        </div>
+    </div>
+
+    <div class="wrap">
+        <!-- Monthly champion banner -->
+        <div class="crown-banner" id="crown-banner">
+            <div style="font-size: 40px;">👑</div>
+            <div class="name" id="crown-name"></div>
+            <div class="pts" id="crown-pts"></div>
+        </div>
+
+        <div class="grid-2">
+            <div class="card">
+                <h2>📅 Today</h2>
+                <div class="podium" id="podium-daily"></div>
+                <table class="board" id="board-daily"></table>
+            </div>
+
+            <div class="card">
+                <h2>🗓️ This Month</h2>
+                <div class="podium" id="podium-monthly"></div>
+                <table class="board" id="board-monthly"></table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+
+        function podiumHTML(board) {
+            const m = ['🥇', '🥈', '🥉'];
+            return [0, 1, 2].map(i => {
+                const p = board[i];
+                if (!p) return '<div class="slot p' + (i + 1) + '"><div class="medal">—</div><div class="nm muted">open</div><div class="pt">0</div></div>';
+                return '<div class="slot p' + (i + 1) + '"><div class="medal">' + m[i] + '</div>' +
+                       '<div class="nm">' + p.name + '</div><div class="pt">' + p.score + '</div></div>';
+            }).join('');
+        }
+
+        function tableHTML(board, highlight) {
+            const start = highlight ? 3 : 0;
+            return board.slice(start).map((row, i) =>
+                '<tr' + (highlight && row.name === highlight ? ' class="me"' : '') + '><td><span class="rank">' +
+                (start + i + 1) + '</span></td><td>' + row.name + '</td>' +
+                '<td style="text-align:right;">' + row.score + ' pts</td>' +
+                '<td style="text-align:right;" class="muted">' + row.correct + ' ✔</td></tr>'
+            ).join('') || '<tr><td class="muted">No scores yet</td></tr>';
+        }
+
+        function render(d) {
+            if (d.winner) {
+                document.getElementById('crown-banner').classList.add('show');
+                document.getElementById('crown-name').innerText = d.winner.name;
+                document.getElementById('crown-pts').innerText =
+                    'Champion of ' + d.month_label + ' with ' + d.winner.points + ' points';
+            }
+            document.getElementById('podium-daily').innerHTML = podiumHTML(d.daily);
+            document.getElementById('podium-monthly').innerHTML = podiumHTML(d.monthly);
+            document.getElementById('board-daily').innerHTML = tableHTML(d.daily, d.daily[0] && d.daily[0].name);
+            document.getElementById('board-monthly').innerHTML = tableHTML(d.monthly, d.monthly[0] && d.monthly[0].name);
+        }
+
+        function refresh() { socket.emit('request_leaderboard'); }
+        socket.on('leaderboard_data', render);
+        refresh();
+        setInterval(refresh, 5000);
+    </script>
+</body>
+</html>

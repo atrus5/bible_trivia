@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: bible-trivia
+    runtime: python
+    plan: free
+    # No rootDir: the app lives at the repo root (app.py, requirements.txt here).
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    healthCheckPath: /api/status
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.6
+      - key: TRIVIA_ADMIN_PIN
+        sync: false      # set this in the Render dashboard (don't keep the default)
+      - key: TRIVIA_SECRET
+        sync: false      # any long random string; used for Socket.IO sessions
+      - key: DATABASE_URL
+        sync: false      # paste your Neon connection string in the Render dashboard

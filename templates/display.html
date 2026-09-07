@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bible Trivia — Stage Display</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        /* Big-screen tweaks for ProPresenter output */
+        #stage {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 32px;
+        }
+        #q-difficulty { margin-bottom: 14px; font-size: 16px; }
+        #question {
+            font-size: 44px;
+            font-weight: 800;
+            line-height: 1.2;
+            margin-bottom: 26px;
+            text-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+        }
+        .option-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+        }
+        .option { font-size: 28px; padding: 20px 24px; border-radius: 14px; }
+        .option .key { width: 36px; height: 36px; font-size: 18px; border-radius: 10px; }
+        #big-timer { font-size: 54px; font-weight: 800; }
+        #big-timer.warn { color: var(--red); }
+        #reveal-ref {
+            display: inline-block;
+            margin-top: 24px;
+            padding: 12px 28px;
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--gold-2);
+            background: rgba(245, 185, 66, 0.12);
+            border: 1px solid rgba(245, 185, 66, 0.45);
+            border-radius: 999px;
+        }
+        #reveal-ref:empty { display: none; }
+        #leader-strip {
+            position: fixed;
+            left: 0; right: 0; bottom: 0;
+            display: flex;
+            justify-content: center;
+            gap: 26px;
+            padding: 12px;
+            background: rgba(15, 18, 32, 0.92);
+            border-top: 1px solid var(--line);
+            font-size: 18px;
+        }
+        #leader-strip b { color: var(--gold-2); }
+        #leader-strip .muted { font-size: 14px; }
+        #status-msg { font-size: 40px; font-weight: 800; text-align: center; margin-top: 18vh; }
+    </style>
+</head>
+<body>
+    <div id="stage">
+        <div id="status-msg">The game is starting soon... 📖</div>
+
+        <div id="question-view" style="display: none;">
+            <div class="timer-wrap" style="max-width: 640px;">
+                <div class="timer-bar" style="height: 14px;"><div class="timer-fill" id="timer-fill"></div></div>
+                <div id="big-timer">30</div>
+            </div>
+            <div><span class="pill" id="q-difficulty"></span></div>
+            <div id="question">Loading...</div>
+            <div class="option-grid" id="options"></div>
+            <div id="reveal-ref"></div>
+            <div id="next-note" style="font-size: 24px; margin-top: 14px; color: var(--gold-2); font-weight: 700;"></div>
+        </div>
+    </div>
+
+    <div id="leader-strip" style="display: none;">
+        <span class="muted">🏆 Today's Top 3:</span>
+        <span id="leader-1"></span>
+        <span id="leader-2"></span>
+        <span id="leader-3"></span>
+    </div>
+
+    <script>
+        const socket = io();
+
+        // Auto-start: when ProPresenter shows this web view, begin the game
+        fetch('/propresenter_start');
+
+        function showQuestionView() {
+            document.getElementById('status-msg').style.display = 'none';
+            document.getElementById('question-view').style.display = 'block';
+            document.getElementById('leader-strip').style.display = 'flex';
+        }
+
+        socket.on('game_status', (status) => {
+            if (!status.active) {
+                document.getElementById('status-msg').innerText =
+                    (status.message || 'The game is starting soon...') + ' 📖';
+                document.getElementById('status-msg').style.display = 'block';
+                document.getElementById('question-view').style.display = 'none';
+            }
+        });
+
+        socket.on('new_question', (q) => {
+            showQuestionView();
+            document.getElementById('question').innerText = q.question;
+            document.getElementById('reveal-ref').innerText = '';
+            const pill = document.getElementById('q-difficulty');
+            pill.className = 'pill ' + q.difficulty;
+            pill.innerText = q.difficulty.toUpperCase();
+
+            const grid = document.getElementById('options');
+            grid.innerHTML = '';
+            q.options.forEach((opt, i) => {
+                const el = document.createElement('div');
+                el.className = 'option';
+                el.dataset.text = opt;
+                el.innerHTML = '<span class="key">' + 'ABCD'[i] + '</span>' + opt;
+                grid.appendChild(el);
+            });
+        });
+
+        socket.on('timer_tick', (data) => {
+            const total = data.total || 30;
+            const num = document.getElementById('big-timer');
+            const fill = document.getElementById('timer-fill');
+            num.innerText = data.active ? data.time_left : "TIME'S UP!";
+            num.className = data.time_left <= 5 && data.active ? 'warn' : '';
+            fill.style.width = Math.max(0, (data.time_left / total) * 100) + '%';
+            fill.className = 'timer-fill' + (data.time_left <= 10 ? ' warn' : '');
+        });
+
+        // Highlight the correct answer among the four options
+        socket.on('reveal_answer', (data) => {
+            [...document.getElementById('options').children].forEach(el => {
+                if (el.dataset.text === data.answer) el.classList.add('correct');
+                else el.classList.add('dim');
+            });
+            if (data.reference) {
+                document.getElementById('reveal-ref').innerText = '📖 ' + data.reference;
+            }
+            if (data.next_in) setNextNote(data.next_in);
+        });
+
+        function setNextNote(secs) {
+            document.getElementById('next-note').innerText =
+                secs > 0 ? '⏭️ Next question in ' + secs + 's…' : '';
+        }
+
+        socket.on('next_question_countdown', (d) => setNextNote(d.seconds));
+        socket.on('new_question', () => setNextNote(0));
+
+        socket.on('update_leaderboard', (board) => {
+            for (let i = 0; i < 3; i++) {
+                const el = document.getElementById('leader-' + (i + 1));
+                if (board[i]) {
+                    el.innerHTML = (i + 1) + '. <b>' + board[i].name + '</b> — ' + board[i].score;
+                } else {
+                    el.innerText = '';
+                }
+            }
+        });
+
+        socket.on('month_crowned', (w) => {
+            document.getElementById('status-msg').innerHTML =
+                '👑 ' + w.month_label + ' Champion<br><span style="font-size:64px; color: var(--gold-2);">' +
+                w.name + '</span><br><span class="muted" style="font-size:26px;">' + w.points + ' points</span>';
+            document.getElementById('status-msg').style.display = 'block';
+            document.getElementById('question-view').style.display = 'none';
+        });
+    </script>
+</body>
+</html>

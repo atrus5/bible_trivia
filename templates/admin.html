@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bible Trivia — Admin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        .wrap { max-width: 1000px; margin: 24px auto; padding: 0 16px; }
+        .controls { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; align-items: center; }
+        .seg { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+        .seg .btn.active { outline: 2px solid var(--gold-2); }
+        .seg-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-right: 4px; }
+        #login-view { max-width: 380px; margin: 80px auto; text-align: center; }
+        #pin { width: 100%; text-align: center; font-size: 22px; letter-spacing: 8px; margin-bottom: 12px; }
+        .q-preview { font-size: 19px; font-weight: 700; margin-bottom: 6px; }
+        .answer-line { font-size: 17px; margin-bottom: 4px; }
+        .answer-line b { color: #7bedaa; }
+        #admin-error { color: #ff9d9d; margin-top: 10px; min-height: 20px; font-weight: 600; }
+        .usage { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; }
+        .usage .chip {
+            background: var(--panel-2);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-size: 13px;
+        }
+        .usage .chip b { color: var(--gold-2); }
+        .toggle { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+        .toggle .state { font-weight: 700; }
+        #countdown-note { color: var(--gold-2); font-weight: 700; min-height: 20px; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <div class="brand">🛠️ Trivia Admin</div>
+        <div class="nav">
+            <a href="/">Play</a>
+            <a href="/leaderboard">Leaderboard</a>
+            <a href="/admin" class="active">Admin</a>
+        </div>
+    </div>
+
+    <!-- PIN login -->
+    <div id="login-view">
+        <div class="card">
+            <h2>Host Login</h2>
+            <p class="muted">Enter the admin PIN (default 1234 — set TRIVIA_ADMIN_PIN to change).</p>
+            <input type="password" id="pin" placeholder="••••" inputmode="numeric">
+            <button class="btn gold" style="width: 100%;" onclick="adminLogin()">Unlock Dashboard 🔓</button>
+            <div id="admin-error"></div>
+        </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div class="wrap" id="dash-view" style="display: none;">
+        <div class="grid-2">
+            <div class="card">
+                <h2>Game Control</h2>
+                <div class="muted" style="margin-bottom: 10px;">
+                    Players connected: <span id="player-count" style="font-weight: 700;">0</span>
+                    &nbsp;·&nbsp; Answered this question: <span id="answered-count" style="font-weight: 700;">0</span>
+                </div>
+
+                <div class="toggle">
+                    <button class="btn" id="autoplay-btn" onclick="emitAdmin('admin_toggle_autoplay')">🤖 Auto-play: OFF</button>
+                    <span class="muted">auto-starts the next question after the reveal</span>
+                </div>
+                <div class="controls">
+                    <div class="seg">
+                        <span class="seg-label">Reveal pause</span>
+                        <button class="btn ghost" data-pause="5" onclick="setPause(5)">5s</button>
+                        <button class="btn ghost" data-pause="10" onclick="setPause(10)">10s</button>
+                        <button class="btn ghost" data-pause="15" onclick="setPause(15)">15s</button>
+                        <button class="btn ghost" data-pause="20" onclick="setPause(20)">20s</button>
+                    </div>
+                </div>
+                <div id="countdown-note"></div>
+
+                <div class="controls">
+                    <button class="btn green" onclick="emitAdmin('admin_next_question')">▶️ Next Question Now</button>
+                    <button class="btn gold" onclick="emitAdmin('admin_reveal')">👁️ Reveal Answer</button>
+                    <button class="btn red" onclick="if (confirm('End the game? (Scores and used questions are kept.)')) emitAdmin('admin_end_game')">⏹️ End Game</button>
+                </div>
+                <div class="controls">
+                    <div class="seg" id="diff-seg">
+                        <span class="seg-label">Difficulty</span>
+                        <button class="btn ghost" data-diff="mixed" onclick="setDifficulty('mixed')">🎲 Mixed</button>
+                        <button class="btn ghost" data-diff="easy" onclick="setDifficulty('easy')">🟢 Easy</button>
+                        <button class="btn ghost" data-diff="medium" onclick="setDifficulty('medium')">🟡 Medium</button>
+                        <button class="btn ghost" data-diff="hard" onclick="setDifficulty('hard')">🔴 Hard</button>
+                    </div>
+                </div>
+                <div class="controls">
+                    <div class="seg" id="timer-seg">
+                        <span class="seg-label">Timer</span>
+                        <button class="btn ghost" data-sec="15" onclick="setTimer(15)">15s</button>
+                        <button class="btn ghost" data-sec="30" onclick="setTimer(30)">30s</button>
+                        <button class="btn ghost" data-sec="45" onclick="setTimer(45)">45s</button>
+                        <button class="btn ghost" data-sec="60" onclick="setTimer(60)">60s</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Current Question</h2>
+                <div id="q-view"><p class="muted">No question live. Press "Next Question" to begin.</p></div>
+            </div>
+
+            <div class="card">
+                <h2>Today's Top 10</h2>
+                <table class="board" id="admin-board"></table>
+            </div>
+
+            <div class="card">
+                <h2>Question Pool — <span id="month-label"></span></h2>
+                <p class="muted">Questions never repeat within the calendar month. Randomly picked per difficulty.</p>
+                <div class="usage" id="usage"></div>
+            </div>
+
+            <div class="card" style="grid-column: 1 / -1;">
+                <h2>Monthly Champion</h2>
+                <p class="muted">At the end of the month, crown the top scorer. Everyone sees the winner on their screens. 🎉</p>
+                <div id="winner-now" class="muted" style="margin-bottom: 14px;"></div>
+                <button class="btn gold" onclick="if (confirm('Crown the current monthly leader as champion?')) emitAdmin('admin_end_month')">👑 Crown Monthly Winner</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let authed = false;
+
+        function emitAdmin(ev, data) { socket.emit(ev, data || {}); }
+
+        function adminLogin() {
+            socket.emit('admin_login', { pin: document.getElementById('pin').value });
+        }
+        document.getElementById('pin').addEventListener('keydown', e => {
+            if (e.key === 'Enter') adminLogin();
+        });
+
+        socket.on('admin_ok', () => {
+            authed = true;
+            document.getElementById('login-view').style.display = 'none';
+            document.getElementById('dash-view').style.display = 'block';
+            socket.emit('request_leaderboard');
+        });
+
+        socket.on('admin_error', (e) => {
+            if (!authed) {
+                document.getElementById('admin-error').innerText = e.message;
+            } else {
+                alert(e.message);
+            }
+        });
+
+        socket.on('admin_state', (s) => {
+            if (!authed) return;
+            document.getElementById('player-count').innerText = s.player_count;
+            document.getElementById('answered-count').innerText = s.answered_count;
+
+            document.querySelectorAll('#diff-seg .btn').forEach(b =>
+                b.classList.toggle('active', b.dataset.diff === s.difficulty));
+            document.querySelectorAll('#timer-seg .btn').forEach(b =>
+                b.classList.toggle('active', +b.dataset.sec === (s.timer_seconds || 30)));
+            document.querySelectorAll('[data-pause]').forEach(b =>
+                b.classList.toggle('active', +b.dataset.pause === (s.pause_seconds || 8)));
+
+            const ap = document.getElementById('autoplay-btn');
+            ap.textContent = s.autoplay ? '🤖 Auto-play: ON' : '🤖 Auto-play: OFF';
+            ap.classList.toggle('green', !!s.autoplay);
+
+            document.getElementById('month-label').innerText = s.month_label;
+            const usage = document.getElementById('usage');
+            usage.innerHTML = ['easy', 'medium', 'hard'].map(t => {
+                const used = (s.used && s.used[t]) || 0;
+                const pool = (s.pool && s.pool[t]) || 0;
+                return '<div class="chip">' + t.toUpperCase() + ': <b>' + used + '</b> / ' + pool + ' used</div>';
+            }).join('');
+
+            const qv = document.getElementById('q-view');
+            if (s.question) {
+                qv.innerHTML =
+                    '<div class="q-preview">' + s.question.question + '</div>' +
+                    '<span class="pill ' + s.question.difficulty + '">' + s.question.difficulty + '</span>' +
+                    '<div class="answer-line" style="margin-top: 10px;">Answer: <b>' + s.answer + '</b></div>' +
+                    (s.reference ? '<div class="muted">📖 ' + s.reference + '</div>' : '') +
+                    '<div class="muted" style="margin-top: 8px;">' +
+                    (s.revealed ? '✅ Revealed' + (s.autoplay ? ' — next question coming up automatically.' : ' — press Next for the next question.') : '⏳ Hidden — players are answering.') +
+                    '</div>';
+            } else {
+                qv.innerHTML = '<p class="muted">No question live. Press "Next Question" to begin.</p>';
+            }
+        });
+
+        socket.on('next_question_countdown', (d) => {
+            document.getElementById('countdown-note').innerText =
+                d.seconds > 0 ? '⏭️ Next question in ' + d.seconds + 's…' : '';
+        });
+
+        function setDifficulty(d) { emitAdmin('admin_set_difficulty', { difficulty: d }); }
+        function setTimer(sec) { emitAdmin('admin_set_timer', { seconds: sec }); }
+        function setPause(sec) { emitAdmin('admin_set_pause', { seconds: sec }); }
+
+        socket.on('update_leaderboard', (board) => {
+            document.getElementById('admin-board').innerHTML = board.map((row, i) =>
+                '<tr><td><span class="rank">' + (i + 1) + '</span></td>' +
+                '<td>' + row.name + '</td>' +
+                '<td style="text-align:right;">' + row.score + ' pts</td>' +
+                '<td style="text-align:right;" class="muted">' + row.correct + ' ✔</td></tr>'
+            ).join('') || '<tr><td class="muted">No scores yet today</td></tr>';
+        });
+
+        socket.on('leaderboard_data', (d) => {
+            const w = document.getElementById('winner-now');
+            if (d.winner) {
+                w.innerHTML = '👑 <b style="color: var(--gold-2);">' + d.winner.name + '</b> won ' +
+                    d.winner.month + ' with ' + d.winner.points + ' points.';
+            } else {
+                w.innerText = 'No champion crowned yet for ' + d.month_label + '.';
+            }
+        });
+
+        socket.on('connect', () => {
+            // Re-auth automatically after a reconnect (PIN is still in the input)
+            if (authed) adminLogin();
+        });
+    </script>
+</body>
+</html>

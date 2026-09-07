@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bible Trivia — Play</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="topbar">
+        <div class="brand">📖 Bible Trivia</div>
+        <div class="nav">
+            <a href="/" class="active">Play</a>
+            <a href="/leaderboard">Leaderboard</a>
+            <a href="/admin">Admin</a>
+        </div>
+    </div>
+
+    <div style="max-width: 560px; margin: 24px auto; padding: 0 16px;">
+        <!-- Join -->
+        <div class="card" id="login-form">
+            <h2>Join the Game</h2>
+            <p class="muted">Pick a name your friends will recognize on the leaderboard.</p>
+            <input type="text" id="username" placeholder="Your name" maxlength="24"
+                   style="width: 100%; margin-bottom: 12px;">
+            <button class="btn gold" style="width: 100%;" onclick="login()">Join Game ✨</button>
+        </div>
+
+        <!-- Game -->
+        <div id="game-view" style="display: none;">
+            <div class="card">
+                <div class="timer-wrap">
+                    <div class="timer-bar"><div class="timer-fill" id="timer-fill"></div></div>
+                    <div class="timer-num" id="timer-num">30</div>
+                </div>
+                <span class="pill" id="difficulty-pill" style="display:none; margin-bottom: 10px;"></span>
+                <h3 id="question-text" style="font-size: 20px;">Waiting for the host...</h3>
+                <div id="options-container"></div>
+                <div class="feedback" id="feedback"></div>
+                <div id="next-note" class="muted" style="font-weight: 700; min-height: 20px;"></div>
+            </div>
+
+            <div class="card" style="margin-top: 16px;">
+                <div class="grid-2">
+                    <div>
+                        <div class="muted" style="font-size: 12px; text-transform: uppercase;">Today</div>
+                        <div style="font-size: 26px; font-weight: 800;" id="daily-score">0</div>
+                    </div>
+                    <div>
+                        <div class="muted" style="font-size: 12px; text-transform: uppercase;">This Month</div>
+                        <div style="font-size: 26px; font-weight: 800;" id="monthly-score">0</div>
+                    </div>
+                </div>
+                <hr style="border: none; border-top: 1px solid var(--line); margin: 14px 0;">
+                <div class="muted" style="font-size: 12px; text-transform: uppercase; margin-bottom: 6px;">Top 5 Today</div>
+                <table class="board" id="mini-board"></table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let pickedIndex = null;
+        let timerTotal = 30;
+
+        function setNextNote(secs) {
+            const el = document.getElementById('next-note');
+            if (el) el.innerText = secs > 0 ? '⏭️ Next question in ' + secs + 's…' : '';
+        }
+        socket.on('next_question_countdown', (d) => setNextNote(d.seconds));
+
+        function login() {
+            const name = document.getElementById('username').value.trim() || 'Anonymous';
+            socket.emit('login', { name: name });
+            document.getElementById('login-form').style.display = 'none';
+            document.getElementById('game-view').style.display = 'block';
+        }
+        document.getElementById('username').addEventListener('keydown', e => {
+            if (e.key === 'Enter') login();
+        });
+
+        socket.on('game_status', (status) => {
+            if (!status.active) {
+                document.getElementById('question-text').innerText = status.message || 'The game is starting soon...';
+                document.getElementById('options-container').innerHTML = '';
+                document.getElementById('difficulty-pill').style.display = 'none';
+            }
+        });
+
+        socket.on('new_question', (q) => {
+            setNextNote(0);
+            pickedIndex = null;
+            document.getElementById('question-text').innerText = q.question;
+            document.getElementById('feedback').innerText = '';
+            document.getElementById('feedback').className = 'feedback';
+
+            const pill = document.getElementById('difficulty-pill');
+            pill.style.display = 'inline-block';
+            pill.className = 'pill ' + q.difficulty;
+            pill.innerText = q.difficulty + ' · ' + (10 + 30) + ' pts × ' + ({easy:1, medium:2, hard:3}[q.difficulty] || 1);
+
+            const container = document.getElementById('options-container');
+            container.innerHTML = '';
+            q.options.forEach((opt, i) => {
+                const btn = document.createElement('button');
+                btn.className = 'option';
+                btn.dataset.text = opt;
+                btn.innerHTML = '<span class="key">' + 'ABCD'[i] + '</span>' + opt;
+                btn.onclick = () => {
+                    pickedIndex = i;
+                    socket.emit('submit_answer', { option: opt });
+                    [...container.children].forEach(b => b.disabled = true);
+                };
+                container.appendChild(btn);
+            });
+        });
+
+        socket.on('timer_tick', (data) => {
+            if (data.total) timerTotal = data.total;
+            const total = timerTotal;
+            const num = document.getElementById('timer-num');
+            const fill = document.getElementById('timer-fill');
+            num.innerText = data.active ? data.time_left : '—';
+            fill.style.width = Math.max(0, (data.time_left / total) * 100) + '%';
+            fill.className = 'timer-fill' + (data.time_left <= 10 ? ' warn' : '');
+        });
+
+        socket.on('answer_result', (res) => {
+            const fb = document.getElementById('feedback');
+            fb.innerText = res.message || (res.correct ? 'Correct! 🎉' : 'Locked in!');
+            fb.className = 'feedback ' + (res.correct ? 'good' : 'bad');
+            if (typeof res.daily === 'number') {
+                document.getElementById('daily-score').innerText = res.daily;
+                document.getElementById('monthly-score').innerText = res.monthly;
+            }
+        });
+
+        // Highlight the correct option among the four when revealed
+        socket.on('reveal_answer', (data) => {
+            if (data.next_in) setNextNote(data.next_in);
+            const container = document.getElementById('options-container');
+            [...container.children].forEach((btn, i) => {
+                btn.disabled = true;
+                if (btn.dataset.text === data.answer) btn.classList.add('correct');
+                else if (i === pickedIndex) btn.classList.add('wrong');
+                else btn.classList.add('dim');
+            });
+            if (pickedIndex === null) {
+                const fb = document.getElementById('feedback');
+                fb.innerText = 'No answer — the correct one is highlighted.';
+                fb.className = 'feedback';
+            }
+            if (data.reference) {
+                const fb = document.getElementById('feedback');
+                const ref = document.createElement('div');
+                ref.className = 'muted';
+                ref.style.fontWeight = '600';
+                ref.style.fontSize = '14px';
+                ref.style.color = 'var(--gold-2)';
+                ref.innerText = '📖 ' + data.reference;
+                fb.appendChild(document.createElement('br'));
+                fb.appendChild(ref);
+            }
+        });
+
+        socket.on('score_update', (s) => {
+            document.getElementById('daily-score').innerText = s.daily;
+            document.getElementById('monthly-score').innerText = s.monthly;
+        });
+
+        socket.on('update_leaderboard', (board) => {
+            const t = document.getElementById('mini-board');
+            t.innerHTML = board.slice(0, 5).map((row, i) =>
+                '<tr><td><span class="rank">' + (i + 1) + '</span></td>' +
+                '<td>' + row.name + '</td><td style="text-align:right;">' + row.score + '</td></tr>'
+            ).join('') || '<tr><td class="muted">No scores yet today</td></tr>';
+        });
+
+        socket.on('month_crowned', (w) => {
+            const fb = document.getElementById('feedback');
+            fb.className = 'feedback good';
+            fb.innerText = '👑 ' + w.month_label + ' champion: ' + w.name + ' (' + w.points + ' pts)';
+        });
+    </script>
+</body>
+</html>
