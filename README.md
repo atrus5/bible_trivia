@@ -59,6 +59,7 @@ Open `/admin` and enter the PIN (default **5364**, set `TRIVIA_ADMIN_PIN` to cha
 - `TRIVIA_ADMIN_PIN` — change the admin PIN (default `5364`)
 - `TRIVIA_SECRET` — Socket.IO secret key
 - `DATABASE_URL` — Postgres connection string (e.g. Neon). When set, scores/settings/winner are stored in Postgres instead of local SQLite.
+- `PUBLIC_JOIN_URL` — the URL the stage-display QR code points to (defaults to the deployed Render URL). Players scan this QR to join.
 
 ## Deploy to Render.com (free)
 The repo includes `render.yaml` (Render Blueprint).

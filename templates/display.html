@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="/static/style.css">
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         /* Big-screen tweaks for ProPresenter output */
         #stage {
@@ -54,12 +55,57 @@
         }
         #leader-strip b { color: var(--gold-2); }
         #leader-strip .muted { font-size: 14px; }
-        #status-msg { font-size: 40px; font-weight: 800; text-align: center; margin-top: 18vh; }
+        #status-msg { font-size: 34px; font-weight: 800; text-align: center; margin-top: 16px; }
+        /* Join-by-QR (pre-game + corner during play) */
+        #pregame-view { text-align: center; }
+        #join-qr {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+            margin-top: 7vh;
+        }
+        #join-qr .qr-card {
+            background: #fff;
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.45);
+        }
+        #join-qr .qr-title { font-size: 34px; font-weight: 800; }
+        #join-qr .qr-url { color: var(--muted); font-size: 18px; max-width: 460px; word-break: break-all; }
+        #corner-qr {
+            position: fixed;
+            right: 24px;
+            bottom: 76px;
+            z-index: 20;
+            text-align: center;
+            display: none;
+        }
+        #corner-qr .qr-card {
+            display: inline-block;
+            background: #fff;
+            padding: 10px;
+            border-radius: 14px;
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+        }
+        #corner-qr .qr-label {
+            margin-top: 6px;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--gold-2);
+        }
     </style>
 </head>
 <body>
     <div id="stage">
+        <div id="pregame-view">
+        <div id="join-qr">
+            <div class="qr-card"><div id="qr-big"></div></div>
+            <div class="qr-title">Scan to Play 📱</div>
+            <div class="qr-url">{{ join_url }}</div>
+        </div>
         <div id="status-msg">The game is starting soon... 📖</div>
+    </div>
 
         <div id="question-view" style="display: none;">
             <div class="timer-wrap" style="max-width: 640px;">
@@ -72,6 +118,11 @@
             <div id="reveal-ref"></div>
             <div id="next-note" style="font-size: 24px; margin-top: 14px; color: var(--gold-2); font-weight: 700;"></div>
         </div>
+    </div>
+
+    <div id="corner-qr">
+        <div class="qr-card"><div id="qr-small"></div></div>
+        <div class="qr-label">Join 📱</div>
     </div>
 
     <div id="leader-strip" style="display: none;">
@@ -87,18 +138,41 @@
         // Auto-start: when ProPresenter shows this web view, begin the game
         fetch('/propresenter_start');
 
-        function showQuestionView() {
-            document.getElementById('status-msg').style.display = 'none';
-            document.getElementById('question-view').style.display = 'block';
-            document.getElementById('leader-strip').style.display = 'flex';
+        // ---- Join-by-QR -------------------------------------------------
+        const joinUrl = {{ join_url | tojson }};
+        function buildQR(elId, size) {
+            new QRCode(document.getElementById(elId), {
+                text: joinUrl,
+                width: size,
+                height: size,
+                colorDark: '#0f1220',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.M
+            });
         }
+        buildQR('qr-big', 260);
+        buildQR('qr-small', 110);
+
+        function showPregame(joinVisible) {
+            document.getElementById('question-view').style.display = 'none';
+            document.getElementById('pregame-view').style.display = 'block';
+            document.getElementById('join-qr').style.display = joinVisible ? 'flex' : 'none';
+            document.getElementById('corner-qr').style.display = 'none';
+            document.getElementById('leader-strip').style.display = 'none';
+        }
+
+        function showQuestionView() {
+            document.getElementById('pregame-view').style.display = 'none';
+            document.getElementById('question-view').style.display = 'block';
+            document.getElementById('corner-qr').style.display = 'block';
+            document.getElementById('leader-strip').style.display = 'flex';
+ }
 
         socket.on('game_status', (status) => {
             if (!status.active) {
                 document.getElementById('status-msg').innerText =
                     (status.message || 'The game is starting soon...') + ' 📖';
-                document.getElementById('status-msg').style.display = 'block';
-                document.getElementById('question-view').style.display = 'none';
+                showPregame(true);
             }
         });
 
@@ -175,8 +249,7 @@
             document.getElementById('status-msg').innerHTML =
                 '👑 ' + w.month_label + ' Champion<br><span style="font-size:64px; color: var(--gold-2);">' +
                 w.name + '</span><br><span class="muted" style="font-size:26px;">' + w.points + ' points</span>';
-            document.getElementById('status-msg').style.display = 'block';
-            document.getElementById('question-view').style.display = 'none';
+            showPregame(false);
         });
     </script>
 </body>

@@ -31,6 +31,9 @@ app.config['SECRET_KEY'] = os.environ.get('TRIVIA_SECRET', 'bible-trivia-secret'
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
 
 ADMIN_PIN = os.environ.get('TRIVIA_ADMIN_PIN', '5364')
+# URL shown in the stage-display QR code. Set PUBLIC_JOIN_URL in Render to your
+# onrender.com address; the fallback below keeps local testing working.
+JOIN_URL = os.environ.get('PUBLIC_JOIN_URL', 'https://bible-trivia-3jke.onrender.com/')
 MULTIPLIER = {'easy': 1, 'medium': 2, 'hard': 3}
 DEFAULT_TIMER = 15
 DEFAULT_PAUSE = 10         # auto-play: seconds between reveal and next question
@@ -451,7 +454,7 @@ def index():
 
 @app.route('/display')
 def display():
-    return render_template('display.html')
+    return render_template('display.html', join_url=JOIN_URL)
 
 @app.route('/admin')
 def admin():
