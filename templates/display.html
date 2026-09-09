@@ -64,7 +64,7 @@
         <div id="question-view" style="display: none;">
             <div class="timer-wrap" style="max-width: 640px;">
                 <div class="timer-bar" style="height: 14px;"><div class="timer-fill" id="timer-fill"></div></div>
-                <div id="big-timer">30</div>
+                <div id="big-timer">15</div>
             </div>
             <div><span class="pill" id="q-difficulty"></span></div>
             <div id="question">Loading...</div>
@@ -122,9 +122,14 @@
         });
 
         socket.on('timer_tick', (data) => {
-            const total = data.total || 30;
+            const total = data.total || 15;
             const num = document.getElementById('big-timer');
             const fill = document.getElementById('timer-fill');
+            if (data.paused) {
+                num.innerText = '⏸ PAUSED';
+                num.className = '';
+                return;
+            }
             num.innerText = data.active ? data.time_left : "TIME'S UP!";
             num.className = data.time_left <= 5 && data.active ? 'warn' : '';
             fill.style.width = Math.max(0, (data.time_left / total) * 100) + '%';
@@ -150,6 +155,10 @@
 
         socket.on('next_question_countdown', (d) => setNextNote(d.seconds));
         socket.on('new_question', () => setNextNote(0));
+        socket.on('game_paused', (d) => {
+            document.getElementById('next-note').innerText =
+                d.paused ? '⏸️ Game paused by host' : '';
+        });
 
         socket.on('update_leaderboard', (board) => {
             for (let i = 0; i < 3; i++) {

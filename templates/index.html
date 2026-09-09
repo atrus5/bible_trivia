@@ -31,7 +31,7 @@
             <div class="card">
                 <div class="timer-wrap">
                     <div class="timer-bar"><div class="timer-fill" id="timer-fill"></div></div>
-                    <div class="timer-num" id="timer-num">30</div>
+                    <div class="timer-num" id="timer-num">15</div>
                 </div>
                 <span class="pill" id="difficulty-pill" style="display:none; margin-bottom: 10px;"></span>
                 <h3 id="question-text" style="font-size: 20px;">Waiting for the host...</h3>
@@ -61,7 +61,8 @@
     <script>
         const socket = io();
         let pickedIndex = null;
-        let timerTotal = 30;
+        let timerTotal = 15;
+        let revealed = false;
 
         function setNextNote(secs) {
             const el = document.getElementById('next-note');
@@ -90,6 +91,7 @@
         socket.on('new_question', (q) => {
             setNextNote(0);
             pickedIndex = null;
+            revealed = false;
             document.getElementById('question-text').innerText = q.question;
             document.getElementById('feedback').innerText = '';
             document.getElementById('feedback').className = 'feedback';
@@ -97,7 +99,7 @@
             const pill = document.getElementById('difficulty-pill');
             pill.style.display = 'inline-block';
             pill.className = 'pill ' + q.difficulty;
-            pill.innerText = q.difficulty + ' · ' + (10 + 30) + ' pts × ' + ({easy:1, medium:2, hard:3}[q.difficulty] || 1);
+            pill.innerText = q.difficulty + ' · ' + (10 + 15) + ' pts × ' + ({easy:1, medium:2, hard:3}[q.difficulty] || 1);
 
             const container = document.getElementById('options-container');
             container.innerHTML = '';
@@ -120,7 +122,7 @@
             const total = timerTotal;
             const num = document.getElementById('timer-num');
             const fill = document.getElementById('timer-fill');
-            num.innerText = data.active ? data.time_left : '—';
+            num.innerText = data.paused ? '⏸' : (data.active ? data.time_left : '—');
             fill.style.width = Math.max(0, (data.time_left / total) * 100) + '%';
             fill.className = 'timer-fill' + (data.time_left <= 10 ? ' warn' : '');
         });
@@ -137,6 +139,7 @@
 
         // Highlight the correct option among the four when revealed
         socket.on('reveal_answer', (data) => {
+            revealed = true;
             if (data.next_in) setNextNote(data.next_in);
             const container = document.getElementById('options-container');
             [...container.children].forEach((btn, i) => {
@@ -161,6 +164,16 @@
                 fb.appendChild(document.createElement('br'));
                 fb.appendChild(ref);
             }
+        });
+
+        socket.on('game_paused', (d) => {
+            const fb = document.getElementById('feedback');
+            fb.className = 'feedback';
+            fb.innerText = d.paused ? '⏸️ Game paused — hold tight!' : '';
+            [...document.getElementById('options-container').children].forEach(b => {
+                if (d.paused) b.disabled = true;
+                else if (!revealed && pickedIndex === null) b.disabled = false;
+            });
         });
 
         socket.on('score_update', (s) => {

@@ -78,7 +78,11 @@
                 <div id="countdown-note"></div>
 
                 <div class="controls">
-                    <button class="btn green" onclick="emitAdmin('admin_next_question')">▶️ Next Question Now</button>
+                    <button class="btn green" onclick="emitAdmin('admin_start')">▶️ Start Game</button>
+                    <button class="btn gold" id="pause-btn" onclick="emitAdmin('admin_pause')">⏸️ Pause</button>
+                    <button class="btn" onclick="emitAdmin('admin_next_question')">⏭️ Next Question Now</button>
+                </div>
+                <div class="controls">
                     <button class="btn gold" onclick="emitAdmin('admin_reveal')">👁️ Reveal Answer</button>
                     <button class="btn red" onclick="if (confirm('End the game? (Scores and used questions are kept.)')) emitAdmin('admin_end_game')">⏹️ End Game</button>
                 </div>
@@ -163,13 +167,20 @@
             document.querySelectorAll('#diff-seg .btn').forEach(b =>
                 b.classList.toggle('active', b.dataset.diff === s.difficulty));
             document.querySelectorAll('#timer-seg .btn').forEach(b =>
-                b.classList.toggle('active', +b.dataset.sec === (s.timer_seconds || 30)));
+                b.classList.toggle('active', +b.dataset.sec === (s.timer_seconds || 15)));
             document.querySelectorAll('[data-pause]').forEach(b =>
-                b.classList.toggle('active', +b.dataset.pause === (s.pause_seconds || 8)));
+                b.classList.toggle('active', +b.dataset.pause === (s.pause_seconds || 10)));
 
             const ap = document.getElementById('autoplay-btn');
             ap.textContent = s.autoplay ? '🤖 Auto-play: ON' : '🤖 Auto-play: OFF';
             ap.classList.toggle('green', !!s.autoplay);
+
+            const pb = document.getElementById('pause-btn');
+            pb.textContent = s.paused ? '▶️ Resume' : '⏸️ Pause';
+            pb.classList.toggle('gold', !!s.paused);
+
+            document.getElementById('countdown-note').innerText =
+                s.paused ? '⏸️ Game paused — timer and auto-advance are on hold.' : '';
 
             document.getElementById('month-label').innerText = s.month_label;
             const usage = document.getElementById('usage');
