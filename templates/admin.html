@@ -65,6 +65,10 @@
                     <button class="btn" id="autoplay-btn" onclick="emitAdmin('admin_toggle_autoplay')">🤖 Auto-play: OFF</button>
                     <span class="muted">auto-starts the next question after the reveal</span>
                 </div>
+                <div class="toggle">
+                    <button class="btn" id="slide-btn" onclick="emitAdmin('admin_toggle_slide_mode')">📺 Slide Mode: OFF</button>
+                    <span class="muted">ProPresenter: one question per slide appearance, reveal holds on screen</span>
+                </div>
                 <div class="controls">
                     <div class="seg">
                         <span class="seg-label">Reveal pause</span>
@@ -173,6 +177,10 @@
             const ap = document.getElementById('autoplay-btn');
             ap.textContent = s.autoplay ? '🤖 Auto-play: ON' : '🤖 Auto-play: OFF';
             ap.classList.toggle('green', !!s.autoplay);
+
+            const sb = document.getElementById('slide-btn');
+            sb.textContent = s.slide_mode ? '📺 Slide Mode: ON' : '📺 Slide Mode: OFF';
+            sb.classList.toggle('green', !!s.slide_mode);
 
             const pb = document.getElementById('pause-btn');
             pb.textContent = s.paused ? '▶️ Resume' : '⏸️ Pause';

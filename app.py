@@ -229,6 +229,7 @@ game = {
     "pause_seconds": DEFAULT_PAUSE,
     "next_question_at": None,  # wall-clock time when auto-advance should fire
     "paused": False,           # host paused: timer frozen, auto-advance held
+    "slide_mode": False,       # ProPresenter mode: one question per slide appearance
 }
 answered = {}                 # question_id -> set of names that already answered
 timer_seconds = DEFAULT_TIMER
@@ -298,7 +299,7 @@ def timer_background_task():
                         timer_running = False
                         reveal_now = True
                 if (game["active"] and game["revealed"] and game["autoplay"]
-                        and game.get("next_question_at")):
+                        and not game.get("slide_mode") and game.get("next_question_at")):
                     pause_left = game["next_question_at"] - time.time()
                     if pause_left <= 0:
                         auto_now = True
@@ -364,6 +365,7 @@ def save_state():
         "autoplay": "1" if game["autoplay"] else "0",
         "pause_seconds": game["pause_seconds"],
         "paused": "1" if game["paused"] else "0",
+        "slide_mode": "1" if game["slide_mode"] else "0",
     })
 
 def restore_state():
@@ -372,6 +374,7 @@ def restore_state():
     game["autoplay"] = get_setting("autoplay", "1") == "1"
     game["pause_seconds"] = int(get_setting("pause_seconds", DEFAULT_PAUSE))
     game["paused"] = get_setting("paused", "0") == "1"
+    game["slide_mode"] = get_setting("slide_mode", "0") == "1"
     if get_setting("active", "0") == "1":
         q = Q_BY_ID.get(get_setting("current_question_id", ""))
         if q:
@@ -401,6 +404,7 @@ def push_admin_state():
         "active": game["active"],
         "revealed": game["revealed"],
         "paused": game["paused"],
+        "slide_mode": game["slide_mode"],
         "difficulty": game["difficulty"],
         "timer_seconds": game.get("timer_seconds", DEFAULT_TIMER),
         "autoplay": game["autoplay"],
@@ -422,7 +426,7 @@ def reveal_answer():
         return
     game["revealed"] = True
     next_in = 0
-    if game["autoplay"]:
+    if game["autoplay"] and not game.get("slide_mode"):
         game["next_question_at"] = time.time() + game["pause_seconds"]
         next_in = game["pause_seconds"]
     socketio.emit('reveal_answer', {
@@ -498,6 +502,27 @@ def handle_connect():
     else:
         emit('game_status', {'active': False,
                              'message': 'The game is starting soon...'})
+
+# ------------------------------------------------------------------
+# ProPresenter slide mode: exactly one question per slide appearance
+# ------------------------------------------------------------------
+_last_slide_start = 0.0
+
+@socketio.on('slide_shown')
+def handle_slide_shown(_data=None):
+    """The stage display emits this whenever ProPresenter (re)loads or re-shows
+    the web slide. In slide mode each appearance shows exactly one question;
+    the reveal just holds on screen until the slide comes around again."""
+    global _last_slide_start
+    if not game.get("slide_mode") or game["paused"]:
+        return
+    if game["active"] and game["question"] and not game["revealed"]:
+        return  # a live unrevealed question is on screen — just resync
+    now = time.time()
+    if now - _last_slide_start < 3:
+        return  # debounce duplicate show events (connect + visibilitychange)
+    _last_slide_start = now
+    start_next_question()
 
 # ------------------------------------------------------------------
 # Player events
@@ -666,6 +691,15 @@ def handle_admin_set_pause(data):
             game["next_question_at"] = time.time() + secs
         save_state()
         push_admin_state()
+
+@socketio.on('admin_toggle_slide_mode')
+@admin_only
+def handle_admin_toggle_slide_mode(_data):
+    game["slide_mode"] = not game["slide_mode"]
+    if game["slide_mode"]:
+        game["next_question_at"] = None  # suspend the continuous auto-advance
+    save_state()
+    push_admin_state()
 
 @socketio.on('admin_end_game')
 @admin_only
