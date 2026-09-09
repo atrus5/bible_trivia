@@ -23,6 +23,7 @@
             <input type="text" id="username" placeholder="Your name" maxlength="24"
                    style="width: 100%; margin-bottom: 12px;">
             <button class="btn gold" style="width: 100%;" onclick="login()">Join Game ✨</button>
+            <div id="login-error" class="feedback bad" style="min-height: 20px;"></div>
         </div>
 
         <!-- Game -->
@@ -72,11 +73,20 @@
         function login() {
             const name = document.getElementById('username').value.trim() || 'Anonymous';
             socket.emit('login', { name: name });
-            document.getElementById('login-form').style.display = 'none';
-            document.getElementById('game-view').style.display = 'block';
         }
         document.getElementById('username').addEventListener('keydown', e => {
             if (e.key === 'Enter') login();
+        });
+
+        socket.on('login_ok', () => {
+            document.getElementById('login-error').innerText = '';
+            document.getElementById('login-form').style.display = 'none';
+            document.getElementById('game-view').style.display = 'block';
+        });
+        socket.on('login_error', (e) => {
+            document.getElementById('login-error').innerText = e.message;
+            document.getElementById('game-view').style.display = 'none';
+            document.getElementById('login-form').style.display = 'block';
         });
 
         socket.on('game_status', (status) => {

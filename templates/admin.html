@@ -126,6 +126,18 @@
             </div>
 
             <div class="card" style="grid-column: 1 / -1;">
+                <h2>Players</h2>
+                <p class="muted">Everyone who has ever played. Reset erases their entire history and frees the name for reuse — good for test entries or name changes.</p>
+                <table class="board" id="players-table">
+                    <thead><tr><th>Name</th><th>Points</th><th>Answers</th><th>Last Played</th><th></th></tr></thead>
+                    <tbody></tbody>
+                </table>
+                <div class="controls" style="margin-top: 14px;">
+                    <button class="btn red" onclick="if (confirm('Wipe ALL scores for everyone? This cannot be undone.')) emitAdmin('admin_reset_all_scores')">🧹 Fresh Start — Wipe All Scores</button>
+                </div>
+            </div>
+
+            <div class="card" style="grid-column: 1 / -1;">
                 <h2>Monthly Champion</h2>
                 <p class="muted">At the end of the month, crown the top scorer. Everyone sees the winner on their screens. 🎉</p>
                 <div id="winner-now" class="muted" style="margin-bottom: 14px;"></div>
@@ -196,6 +208,15 @@
                 const pool = (s.pool && s.pool[t]) || 0;
                 return '<div class="chip">' + t.toUpperCase() + ': <b>' + used + '</b> / ' + pool + ' used</div>';
             }).join('');
+
+            const ptbody = document.querySelector('#players-table tbody');
+            ptbody.innerHTML = (s.players || []).map(p =>
+                '<tr><td>' + p.name + '</td><td>' + p.points + '</td><td>' + p.answers +
+                '</td><td class="muted">' + (p.last || '') + '</td>' +
+                '<td><button class="btn red" style="padding: 4px 10px; font-size: 12px;" ' +
+                'onclick="if (confirm(\'Erase all scores for ' + p.name.replace(/'/g, "\\'" ) + '? This cannot be undone.\')) ' +
+                'emitAdmin(\'admin_reset_player\', { name: ' + JSON.stringify(p.name) + ' })">Reset</button></td></tr>'
+            ).join('') || '<tr><td colspan="5" class="muted">No players have scored yet.</td></tr>';
 
             const qv = document.getElementById('q-view');
             if (s.question) {

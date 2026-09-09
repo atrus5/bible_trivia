@@ -131,6 +131,9 @@ def init_db():
         conn.execute("""CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL)""")
+        conn.execute(f"""CREATE TABLE IF NOT EXISTS players (
+            name TEXT PRIMARY KEY,
+            created_at TEXT NOT NULL)""")
 
 def get_setting(key, default=None):
     with db() as conn:
@@ -154,6 +157,44 @@ def save_answer(name, question_id, correct, points):
 
 def board(rows):
     return [{"name": r["name"], "score": r["pts"], "correct": r["c"]} for r in rows]
+
+def name_taken(name):
+    """True if any player has reserved or ever scored under this name."""
+    with db() as conn:
+        row = conn.execute("""SELECT 1 FROM (
+                SELECT name FROM players UNION ALL SELECT name FROM answers
+            ) WHERE LOWER(name)=LOWER(?) LIMIT 1""", (name,)).fetchone()
+    return row is not None
+
+def reserve_name(name):
+    ts = datetime.now().isoformat(timespec='seconds')
+    with db() as conn:
+        if USE_POSTGRES:
+            conn.execute("""INSERT INTO players (name, created_at) VALUES (?, ?)
+                ON CONFLICT (name) DO NOTHING""", (name, ts))
+        else:
+            conn.execute("INSERT OR IGNORE INTO players (name, created_at) VALUES (?, ?)",
+                         (name, ts))
+
+def get_all_players():
+    """Everyone who has ever played (reserved a name or scored): points,
+    answer count, last active. Works on both SQLite and Postgres."""
+    with db() as conn:
+        scored = conn.execute("""SELECT LOWER(name) k, MIN(name) name,
+                SUM(points) pts, COUNT(*) n, MAX(ts) last
+            FROM answers GROUP BY LOWER(name)""").fetchall()
+        reserved = {r["k"]: r["name"] for r in conn.execute(
+            "SELECT LOWER(name) k, MIN(name) name FROM players GROUP BY LOWER(name)").fetchall()}
+    out, seen = [], set()
+    for r in scored:
+        seen.add(r["k"])
+        out.append({"name": reserved.get(r["k"], r["name"]),
+                    "points": r["pts"], "answers": r["n"], "last": r["last"]})
+    for k, name in reserved.items():
+        if k not in seen:  # joined but never answered
+            out.append({"name": name, "points": 0, "answers": 0, "last": ""})
+    out.sort(key=lambda p: p["last"], reverse=True)
+    return out
 
 def get_daily_board():
     with db() as conn:
@@ -417,6 +458,7 @@ def push_admin_state():
         "reference": q.get("reference", "") if q else "",
         "answered_count": len(answered.get(q["id"], set())) if q else 0,
         "player_count": len(players),
+        "players": get_all_players(),
     })
 
 def reveal_answer():
@@ -530,7 +572,15 @@ def handle_slide_shown(_data=None):
 @socketio.on('login')
 def handle_login(data):
     name = (data.get('name') or 'Anonymous').strip()[:24] or 'Anonymous'
+    # Names are unique (case-insensitive) so two people can't share a score.
+    # Rejoining with your own current name is fine; resetting a player frees it.
+    if players.get(request.sid) != name and name_taken(name):
+        emit('login_error', {'message':
+            f'"{name}" is already taken — pick another name.'})
+        return
     players[request.sid] = name
+    reserve_name(name)
+    emit('login_ok', {})
     daily, monthly = get_player_points(name)
     emit('score_update', {'daily': daily, 'monthly': monthly})
     push_leaderboard()
@@ -699,6 +749,38 @@ def handle_admin_toggle_slide_mode(_data):
     if game["slide_mode"]:
         game["next_question_at"] = None  # suspend the continuous auto-advance
     save_state()
+    push_admin_state()
+
+@socketio.on('admin_reset_player')
+@admin_only
+def handle_admin_reset_player(data):
+    """Erase one player's entire history and free their name for reuse."""
+    name = (data.get('name') or '').strip()
+    if not name:
+        emit('admin_error', {'message': 'No player specified.'})
+        return
+    with db() as conn:
+        conn.execute("DELETE FROM answers WHERE LOWER(name)=LOWER(?)", (name,))
+        conn.execute("DELETE FROM players WHERE LOWER(name)=LOWER(?)", (name,))
+    # They may have answered the live question under that name — un-mark them.
+    for qid, names in list(answered.items()):
+        answered[qid] = {n for n in names if n.lower() != name.lower()}
+    socketio.emit('leaderboard_data', {
+        "daily": get_daily_board(), "monthly": get_monthly_board(),
+        "winner": get_month_winner(),
+        "month_label": datetime.now().strftime('%B %Y')})
+    push_leaderboard()
+    push_admin_state()
+
+@socketio.on('admin_reset_all_scores')
+@admin_only
+def handle_admin_reset_all_scores(_data):
+    """Fresh start: wipe every score from every player."""
+    with db() as conn:
+        conn.execute("DELETE FROM answers")
+        conn.execute("DELETE FROM players")
+    answered.clear()
+    push_leaderboard()
     push_admin_state()
 
 @socketio.on('admin_end_game')

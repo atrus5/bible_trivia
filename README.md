@@ -4,9 +4,9 @@ A real-time Bible trivia game built to run inside **ProPresenter** (web embed), 
 
 ## Included Files
 - `app.py`: Flask-SocketIO backend — SQLite persistence, auto-play cycling, monthly question tracking, reveal-answer flow, admin events.
-- `data/questions_easy.json`: 40 easy questions.
-- `data/questions_medium.json`: 30 medium questions.
-- `data/questions_hard.json`: 30 hard questions.
+- `data/questions_easy.json`: 80 easy questions.
+- `data/questions_medium.json`: 60 medium questions.
+- `data/questions_hard.json`: 60 hard questions.
 - `templates/index.html`: Player interface (phones).
 - `templates/display.html`: Stage display for ProPresenter.
 - `templates/admin.html`: Admin dashboard (host control).
@@ -53,6 +53,7 @@ Open `/admin` and enter the PIN (default **5364**, set `TRIVIA_ADMIN_PIN` to cha
 - ⏱️ Set the timer: 15 / 30 / 45 / 60 seconds
 - 📊 See question-pool usage for the month
 - ⏹️ End the game (scores and used questions are kept)
+- 👥 **Players** — see everyone who has ever played, reset one player's scores (frees the name for reuse), or wipe all scores with Fresh Start
 - 👑 Crown the **monthly champion** (broadcast to all screens)
 
 ### Environment variables (optional)
@@ -90,6 +91,7 @@ Notes:
 - Base **10 points** + a speed bonus equal to seconds remaining
 - Multiplied by difficulty: easy ×1, medium ×2, hard ×3
 - One answer per player per question
+- **Names are unique** — a name that has ever scored can't be reused until an admin resets that player
 
 ## Question Rules
 - Questions are picked **randomly**, per difficulty tier
