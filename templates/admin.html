@@ -143,8 +143,10 @@
             <div class="card" style="grid-column: 1 / -1;">
                 <h2>Monthly Champion</h2>
                 <p class="muted">At the end of the month, crown the top scorer. Everyone sees the winner on their screens. 🎉</p>
-                <div id="winner-now" class="muted" style="margin-bottom: 14px;"></div>
+                        <div id="winner-now" class="muted" style="margin-bottom: 14px;"></div>
                 <button class="btn gold" onclick="if (confirm('Crown the current monthly leader as champion?')) emitAdmin('admin_end_month')">👑 Crown Monthly Winner</button>
+                <button class="btn red" id="uncrown-btn" style="display: none;" onclick="if (confirm('Remove the crowned champion for ' +
+                    document.getElementById('month-label').innerText + '? The crown can be given again after more playing.')) emitAdmin('admin_reset_month_winner')">👑❌ Reset Monthly Champion</button>
                 <button class="btn ghost" onclick="if (confirm('Lock this dashboard? You will need the PIN to get back in.')) emitAdmin('admin_logout')">🔒 Lock Dashboard</button>
             </div>
         </div>
@@ -227,6 +229,13 @@
                 s.paused ? '⏸️ Game paused — timer and auto-advance are on hold.' : '';
 
             document.getElementById('month-label').innerText = s.month_label;
+            const ub = document.getElementById('uncrown-btn');
+            if (s.month_winner) {
+                ub.style.display = 'inline-block';
+                ub.innerText = '👑❌ Reset Monthly Champion (' + s.month_winner.name + ')';
+            } else {
+                ub.style.display = 'none';
+            }
             const usage = document.getElementById('usage');
             usage.innerHTML = ['easy', 'medium', 'hard'].map(t => {
                 const used = (s.used && s.used[t]) || 0;

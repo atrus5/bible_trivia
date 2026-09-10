@@ -83,11 +83,17 @@
         }
 
         function render(d) {
+            const banner = document.getElementById('crown-banner');
             if (d.winner) {
-                document.getElementById('crown-banner').classList.add('show');
+                banner.classList.add('show');
                 document.getElementById('crown-name').innerText = d.winner.name;
                 document.getElementById('crown-pts').innerText =
                     'Champion of ' + d.month_label + ' with ' + d.winner.points + ' points';
+            } else {
+                // Crown removed (or not yet given) — hide the banner.
+                banner.classList.remove('show');
+                document.getElementById('crown-name').innerText = '';
+                document.getElementById('crown-pts').innerText = '';
             }
             document.getElementById('podium-daily').innerHTML = podiumHTML(d.daily);
             document.getElementById('podium-monthly').innerHTML = podiumHTML(d.monthly);

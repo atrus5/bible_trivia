@@ -164,24 +164,6 @@ def save_answer(name, question_id, correct, points):
 def board(rows):
     return [{"name": r["name"], "score": r["pts"], "correct": r["c"]} for r in rows]
 
-def name_taken(name):
-    """True if any player has reserved or ever scored under this name."""
-    with db() as conn:
-        row = conn.execute("""SELECT 1 FROM (
-                SELECT name FROM players UNION ALL SELECT name FROM answers
-            ) WHERE LOWER(name)=LOWER(?) LIMIT 1""", (name,)).fetchone()
-    return row is not None
-
-def reserve_name(name):
-    ts = datetime.now().isoformat(timespec='seconds')
-    with db() as conn:
-        if USE_POSTGRES:
-            conn.execute("""INSERT INTO players (name, created_at) VALUES (?, ?)
-                ON CONFLICT (name) DO NOTHING""", (name, ts))
-        else:
-            conn.execute("INSERT OR IGNORE INTO players (name, created_at) VALUES (?, ?)",
-                         (name, ts))
-
 def get_all_players():
     """Everyone who has ever played (reserved a name or scored): points,
     answer count, last active. Works on both SQLite and Postgres."""
@@ -303,6 +285,34 @@ def _hash_token(token):
     return _hashlib.sha256(token.encode()).hexdigest()
 
 
+def _persist_sessions():
+    """Save session tokens to the DB so a restart/deploy doesn't log everyone
+    out (server memory is wiped on every Render deploy)."""
+    try:
+        payload = json.dumps({"player": player_tokens,
+                              "admin": sorted(admin_tokens)})
+        set_settings_kv({"sessions": payload})
+    except Exception:
+        pass
+
+
+def _load_sessions():
+    """Restore session tokens saved by a previous server run."""
+    raw = get_setting("sessions")
+    if not raw:
+        return
+    try:
+        data = json.loads(raw)
+        player = data.get("player")
+        admin = data.get("admin")
+        if isinstance(player, dict):
+            player_tokens.update({str(t): str(n) for t, n in player.items()})
+        if isinstance(admin, list):
+            admin_tokens.update(str(h) for h in admin)
+    except Exception:
+        pass  # corrupt payload — start with empty sessions
+
+
 def issue_player_token(name):
     """Create a fresh rejoin token for a player and retire their old one(s),
     so a name only has one live session."""
@@ -310,7 +320,14 @@ def issue_player_token(name):
     player_tokens[token] = name
     for t in [t for t, n in player_tokens.items() if n == name and t != token]:
         player_tokens.pop(t, None)
+    _persist_sessions()
     return token
+
+
+def name_in_use(name):
+    """True only while someone is ACTIVELY connected under this name.
+    Offline names are always free to reclaim — no permanent lockout."""
+    return name.lower() in {n.lower() for n in players.values()}
 
 def public_question(q):
     return {"id": q["id"], "question": q["question"], "options": q["options"],
@@ -486,6 +503,7 @@ def push_admin_state():
         "used": used_this_month(),
         "pool": POOL_SIZES,
         "month_label": datetime.now().strftime('%B %Y'),
+        "month_winner": get_month_winner(),
         "question": public_question(q) if q else None,
         "answer": q["answer"] if q else None,
         "reference": q.get("reference", "") if q else "",
@@ -611,7 +629,6 @@ def handle_login(data):
         if token in player_tokens:
             name = player_tokens[token]
             players[request.sid] = name
-            reserve_name(name)
             emit('login_ok', {'name': name, 'rejoin_token': token, 'rejoined': True})
             _send_join_context(name)
             return
@@ -620,14 +637,13 @@ def handle_login(data):
             'Your session expired — enter your name to join again.'})
         return
     name = (data.get('name') or 'Anonymous').strip()[:24] or 'Anonymous'
-    # Names are unique (case-insensitive) so two people can't share a score.
-    # Rejoining with your own current name is fine; resetting a player frees it.
-    if players.get(request.sid) != name and name_taken(name):
+    # A name is only blocked while someone is actively connected under it —
+    # reclaiming your own name after coming back (or a restart) always works.
+    if players.get(request.sid) != name and name_in_use(name):
         emit('login_error', {'message':
-            f'"{name}" is already taken — pick another name.'})
+            f'"{name}" is playing right now — try another name or add a nickname.'})
         return
     players[request.sid] = name
-    reserve_name(name)
     new_token = issue_player_token(name)
     emit('login_ok', {'name': name, 'rejoin_token': new_token})
     _send_join_context(name)
@@ -842,6 +858,7 @@ def handle_admin_reset_player(data):
     # Kill any live rejoin token for that name, so they truly start fresh.
     for t in [t for t, n in player_tokens.items() if n.lower() == name.lower()]:
         player_tokens.pop(t, None)
+    _persist_sessions()
     # They may have answered the live question under that name — un-mark them.
     for qid, names in list(answered.items()):
         answered[qid] = {n for n in names if n.lower() != name.lower()}
@@ -879,6 +896,7 @@ def handle_admin_reset_all_scores(_data):
         conn.execute("DELETE FROM answers")
         conn.execute("DELETE FROM players")
     player_tokens.clear()
+    _persist_sessions()
     answered.clear()
     push_leaderboard()
     push_admin_state()
@@ -909,6 +927,25 @@ def handle_admin_end_month(_data):
     else:
         emit('admin_error', {'message': 'No scores this month yet.'})
 
+@socketio.on('admin_reset_month_winner')
+@admin_only
+def handle_admin_reset_month_winner(_data):
+    """Remove the crowned champion for the current month (un-crown). The
+    crown can be given again after more playing — nothing else is touched."""
+    month = current_month()
+    with db() as conn:
+        conn.execute("DELETE FROM monthly_winners WHERE month=?", (month,))
+    socketio.emit('leaderboard_data', {
+        "daily": get_daily_board(), "monthly": get_monthly_board(),
+        "winner": get_month_winner(),
+        "month_label": datetime.now().strftime('%B %Y')})
+    # If the stage display is stuck on the champion screen (no live game),
+    # send it back to the pregame view.
+    if not game["active"]:
+        socketio.emit('game_status', {'active': False,
+                                      'message': 'The game is starting soon...'})
+    push_admin_state()
+
 @socketio.on('admin_logout')
 def handle_admin_logout(_data=None):
     """Intentionally forget this browser's admin session: the dashboard locks
@@ -931,6 +968,7 @@ def handle_disconnect():
 # ------------------------------------------------------------------
 init_db()
 restore_state()
+_load_sessions()          # sessions survive restarts (Render redeploys!)
 socketio.start_background_task(timer_background_task)
 
 if __name__ == '__main__':

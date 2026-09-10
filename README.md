@@ -91,7 +91,8 @@ Notes:
 - Base **10 points** + a speed bonus equal to seconds remaining
 - Multiplied by difficulty: easy ×1, medium ×2, hard ×3
 - One answer per player per question
-- **Names are unique** — a name that has ever scored can't be reused until an admin resets that player
+- **Name protection without lockout** — a name can't be doubled while someone is actively playing under it, but reclaiming your own name later always works (even after a server restart). Sessions are remembered per device, so returning players just reappear.
+- **Reset tools** — per-player reset, **Reset Month** (wipes the month's scores and question usage; crowned champions are kept), and a full Fresh Start in the admin dashboard
 
 ## Question Rules
 - Questions are picked **randomly**, per difficulty tier
