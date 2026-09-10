@@ -687,6 +687,14 @@ def handle_switch_player(data):
 def handle_answer(data):
     sid = request.sid
     name = players.get(sid)
+    # Safety net: if the connection dropped and reconnected (new session id)
+    # but the player's browser still holds a valid rejoin token, restore
+    # their identity here — otherwise a correct answer would bounce with
+    # "Answering is closed" and score zero.
+    token = (data or {}).get('rejoin_token')
+    if not name and token and token in player_tokens:
+        name = player_tokens[token]
+        players[sid] = name
     q = game["question"]
     if not name or not q or game["revealed"]:
         emit('answer_result', {'correct': False, 'locked': True,

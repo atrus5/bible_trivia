@@ -64,6 +64,12 @@
 
     <script>
         const socket = io();
+        // If the connection drops and reconnects (phone lock, Wi-Fi blip), the
+        // server forgets who we are — re-join silently with the saved token.
+        socket.on('connect', () => {
+            const t = localStorage.getItem(TOKEN_KEY);
+            if (t) socket.emit('login', { rejoin_token: t });
+        });
         let pickedIndex = null;
         let timerTotal = 15;
         let revealed = false;
@@ -161,7 +167,7 @@
                 btn.onclick = () => {
                     pickedIndex = i;
                     [...container.children].forEach((b, j) => b.classList.toggle('picked', j === i));
-                    socket.emit('submit_answer', { option: opt });
+                    socket.emit('submit_answer', { option: opt, rejoin_token: localStorage.getItem(TOKEN_KEY) });
                     [...container.children].forEach(b => b.disabled = true);
                 };
                 container.appendChild(btn);
