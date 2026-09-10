@@ -159,6 +159,16 @@ input:focus, select:focus { border-color: var(--purple); }
   background: rgba(255, 82, 82, 0.12);
   opacity: 0.75;
 }
+.option.picked {
+  border-color: var(--purple);
+  background: rgba(124, 92, 255, 0.22);
+  box-shadow: 0 0 0 2px rgba(124, 92, 255, 0.5), 0 0 24px rgba(124, 92, 255, 0.3);
+}
+.option.picked.correct {
+  border-color: var(--green);
+  background: rgba(46, 204, 113, 0.18);
+  box-shadow: 0 0 0 2px rgba(46, 204, 113, 0.35), 0 0 24px rgba(46, 204, 113, 0.25);
+}
 .option.dim { opacity: 0.45; }
 
 /* Leaderboard table */

@@ -7,34 +7,52 @@
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        /* Big-screen tweaks for ProPresenter output */
+        /* Big-screen tweaks for ProPresenter output.
+           Sizes use vw/clamp so everything fits on any projector — nothing
+           gets pushed below the screen edge. */
         #stage {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
-            padding: 40px 32px;
+            padding: 3vh 3vw;
         }
-        #q-difficulty { margin-bottom: 14px; font-size: 20px; }
+        #question-view {
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            min-height: 88vh;
+        }
+        #q-difficulty { margin-bottom: 1.4vh; font-size: clamp(14px, 1.1vw, 20px); }
         #question {
-            font-size: 76px;
+            font-size: clamp(40px, 3.6vw, 68px);
             font-weight: 800;
-            line-height: 1.15;
-            margin-bottom: 34px;
+            line-height: 1.18;
+            margin-bottom: 2.6vh;
             text-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
         }
         .option-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 22px;
+            gap: 1.6vh 22px;
         }
-        .option { font-size: 42px; padding: 26px 32px; border-radius: 16px; }
-        .option .key { width: 52px; height: 52px; font-size: 26px; border-radius: 12px; }
-        #big-timer { font-size: 88px; font-weight: 800; }
+        .option {
+            font-size: clamp(20px, 1.8vw, 34px);
+            padding: 1.6vh 2vw;
+            border-radius: 16px;
+        }
+        .option .key {
+            width: clamp(30px, 2.4vw, 46px);
+            height: clamp(30px, 2.4vw, 46px);
+            font-size: clamp(16px, 1.2vw, 22px);
+            border-radius: 12px;
+            margin-right: 0.9vw;
+        }
+        #big-timer { font-size: clamp(44px, 4vw, 76px); font-weight: 800; }
         #big-timer.warn { color: var(--red); }
         #reveal-ref {
             display: inline-block;
-            margin-top: 30px;
-            padding: 14px 34px;
-            font-size: 34px;
+            margin-top: 2.4vh;
+            padding: 1.2vh 2.4vw;
+            font-size: clamp(18px, 1.7vw, 32px);
             font-weight: 700;
             color: var(--gold-2);
             background: rgba(245, 185, 66, 0.12);
@@ -54,30 +72,32 @@
             font-size: 18px;
         }
         #leader-strip b { color: var(--gold-2); }
-        #leader-strip .muted { font-size: 14px; }
-        #status-msg { font-size: 40px; font-weight: 800; text-align: center; margin-top: 10vh; }
-        #next-note { font-size: 30px !important; margin-top: 20px !important; }
-        /* Join-by-QR (pre-game + corner during play) */
+        #leader-strip .muted { font-size: clamp(11px, 0.9vw, 14px); }
+        #leader-strip { font-size: clamp(13px, 1.1vw, 18px); gap: 2vw; padding: 1.2vh; }
+        #status-msg { font-size: clamp(28px, 2.6vw, 48px); font-weight: 800; text-align: center; margin-top: 6vh; }
+        #next-note { font-size: clamp(16px, 1.4vw, 26px) !important; margin-top: 1.8vh !important; }
+        /* Join-by-QR (pre-game + corner during play) — sizes bumped for
+           readability from the back rows */
         #pregame-view { text-align: center; }
         #join-qr {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 14px;
-            margin-top: 7vh;
+            gap: 1.8vh;
+            margin-top: 4vh;
         }
         #join-qr .qr-card {
             background: #fff;
-            padding: 20px;
-            border-radius: 20px;
+            padding: 24px;
+            border-radius: 24px;
             box-shadow: 0 12px 48px rgba(0, 0, 0, 0.45);
         }
-        #join-qr .qr-title { font-size: 40px; font-weight: 800; }
-        #join-qr .qr-url { color: var(--muted); font-size: 22px; max-width: 560px; word-break: break-all; }
+        #join-qr .qr-title { font-size: clamp(34px, 3vw, 56px); font-weight: 800; }
+        #join-qr .qr-url { color: var(--muted); font-size: clamp(18px, 1.6vw, 30px); max-width: 60vw; word-break: break-all; }
         #corner-qr {
             position: fixed;
-            right: 24px;
-            bottom: 76px;
+            right: 28px;
+            bottom: 96px;
             z-index: 20;
             text-align: center;
             display: none;
@@ -85,13 +105,13 @@
         #corner-qr .qr-card {
             display: inline-block;
             background: #fff;
-            padding: 10px;
-            border-radius: 14px;
+            padding: 14px;
+            border-radius: 16px;
             box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
         }
         #corner-qr .qr-label {
-            margin-top: 6px;
-            font-size: 14px;
+            margin-top: 8px;
+            font-size: 20px;
             font-weight: 700;
             color: var(--gold-2);
         }
@@ -151,8 +171,8 @@
                 correctLevel: QRCode.CorrectLevel.M
             });
         }
-        buildQR('qr-big', 340);
-        buildQR('qr-small', 110);
+        buildQR('qr-big', 560);
+        buildQR('qr-small', 190);
 
         // Slide mode: tell the server every time ProPresenter shows this slide.
         // On each appearance it starts exactly one new question (server debounced).

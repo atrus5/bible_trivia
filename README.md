@@ -45,7 +45,7 @@ Question shown → 30s timer → answer locked → correct answer revealed
 - Turn auto-play OFF to drive each question manually with the buttons instead
 
 ## Admin Dashboard
-Open `/admin` and enter the PIN (default **5364**, set `TRIVIA_ADMIN_PIN` to change it). From there you can:
+Open `/admin` and enter the admin PIN (set via the `TRIVIA_ADMIN_PIN` environment variable — it is not published anywhere). From there you can:
 - ▶️ Force the next question immediately
 - 👁️ **Reveal the answer** — the correct option lights up green on every screen, with the verse reference
 - 🤖 Toggle auto-play and set the reveal pause
@@ -57,7 +57,7 @@ Open `/admin` and enter the PIN (default **5364**, set `TRIVIA_ADMIN_PIN` to cha
 - 👑 Crown the **monthly champion** (broadcast to all screens)
 
 ### Environment variables (optional)
-- `TRIVIA_ADMIN_PIN` — change the admin PIN (default `5364`)
+- `TRIVIA_ADMIN_PIN` — the admin PIN (no default published — set it yourself)
 - `TRIVIA_SECRET` — Socket.IO secret key
 - `DATABASE_URL` — Postgres connection string (e.g. Neon). When set, scores/settings/winner are stored in Postgres instead of local SQLite.
 - `PUBLIC_JOIN_URL` — the URL the stage-display QR code points to (defaults to the deployed Render URL). Players scan this QR to join.

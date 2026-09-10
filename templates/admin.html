@@ -29,6 +29,7 @@
         .toggle { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
         .toggle .state { font-weight: 700; }
         #countdown-note { color: var(--gold-2); font-weight: 700; min-height: 20px; }
+        #players-table button { padding: 4px 10px; font-size: 12px; }
     </style>
 </head>
 <body>
@@ -44,7 +45,7 @@
     <div id="login-view">
         <div class="card">
             <h2>Host Login</h2>
-            <p class="muted">Enter the admin PIN (default 1234 — set TRIVIA_ADMIN_PIN to change).</p>
+            <p class="muted">Enter the admin PIN.<br><span style="font-size: 12px;">Set via TRIVIA_ADMIN_PIN in your hosting dashboard.</span></p>
             <input type="password" id="pin" placeholder="••••" inputmode="numeric">
             <button class="btn gold" style="width: 100%;" onclick="adminLogin()">Unlock Dashboard 🔓</button>
             <div id="admin-error"></div>
@@ -133,6 +134,8 @@
                     <tbody></tbody>
                 </table>
                 <div class="controls" style="margin-top: 14px;">
+                    <button class="btn gold" onclick="if (confirm('Reset the month? All scores and question usage for ' +
+                        document.getElementById('month-label').innerText + ' are wiped. Crowned champions are kept.')) emitAdmin('admin_reset_month')">📅 Reset Month</button>
                     <button class="btn red" onclick="if (confirm('Wipe ALL scores for everyone? This cannot be undone.')) emitAdmin('admin_reset_all_scores')">🧹 Fresh Start — Wipe All Scores</button>
                 </div>
             </div>
@@ -142,6 +145,7 @@
                 <p class="muted">At the end of the month, crown the top scorer. Everyone sees the winner on their screens. 🎉</p>
                 <div id="winner-now" class="muted" style="margin-bottom: 14px;"></div>
                 <button class="btn gold" onclick="if (confirm('Crown the current monthly leader as champion?')) emitAdmin('admin_end_month')">👑 Crown Monthly Winner</button>
+                <button class="btn ghost" onclick="if (confirm('Lock this dashboard? You will need the PIN to get back in.')) emitAdmin('admin_logout')">🔒 Lock Dashboard</button>
             </div>
         </div>
     </div>
@@ -149,25 +153,46 @@
     <script>
         const socket = io();
         let authed = false;
+        // Admin session persistence: once the dashboard is unlocked, the browser
+        // keeps a session token in localStorage so switching screens or reloading
+        // never asks for the PIN again. Logout clears it.
+        const ADMIN_SESSION_KEY = 'trivia_admin_session';
 
         function emitAdmin(ev, data) { socket.emit(ev, data || {}); }
 
-        function adminLogin() {
-            socket.emit('admin_login', { pin: document.getElementById('pin').value });
+        function adminLogin(sessionToken) {
+            const msg = {};
+            if (sessionToken) {
+                msg.session_token = sessionToken;
+            } else {
+                msg.pin = document.getElementById('pin').value;
+            }
+            socket.emit('admin_login', msg);
         }
         document.getElementById('pin').addEventListener('keydown', e => {
             if (e.key === 'Enter') adminLogin();
         });
 
-        socket.on('admin_ok', () => {
+        socket.on('admin_ok', (s) => {
             authed = true;
+            if (s && s.session_token) {
+                localStorage.setItem(ADMIN_SESSION_KEY, s.session_token);
+            }
             document.getElementById('login-view').style.display = 'none';
             document.getElementById('dash-view').style.display = 'block';
             socket.emit('request_leaderboard');
         });
 
+        socket.on('admin_logged_out', () => {
+            authed = false;
+            localStorage.removeItem(ADMIN_SESSION_KEY);
+            document.getElementById('dash-view').style.display = 'none';
+            document.getElementById('login-view').style.display = 'block';
+        });
+
         socket.on('admin_error', (e) => {
             if (!authed) {
+                localStorage.removeItem(ADMIN_SESSION_KEY);
                 document.getElementById('admin-error').innerText = e.message;
             } else {
                 alert(e.message);
@@ -213,9 +238,9 @@
             ptbody.innerHTML = (s.players || []).map(p =>
                 '<tr><td>' + p.name + '</td><td>' + p.points + '</td><td>' + p.answers +
                 '</td><td class="muted">' + (p.last || '') + '</td>' +
-                '<td><button class="btn red" style="padding: 4px 10px; font-size: 12px;" ' +
-                'onclick="if (confirm(\'Erase all scores for ' + p.name.replace(/'/g, "\\'" ) + '? This cannot be undone.\')) ' +
-                'emitAdmin(\'admin_reset_player\', { name: ' + JSON.stringify(p.name) + ' })">Reset</button></td></tr>'
+                '<td><button class="btn red" data-reset-name="' +
+                p.name.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;') +
+                '">Reset</button></td></tr>'
             ).join('') || '<tr><td colspan="5" class="muted">No players have scored yet.</td></tr>';
 
             const qv = document.getElementById('q-view');
@@ -242,6 +267,28 @@
         function setTimer(sec) { emitAdmin('admin_set_timer', { seconds: sec }); }
         function setPause(sec) { emitAdmin('admin_set_pause', { seconds: sec }); }
 
+        // Per-player Reset uses event delegation — an inline onclick with a
+        // JSON-stringified name breaks the HTML attribute on some names.
+        document.querySelector('#players-table tbody').addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-reset-name]');
+            if (!btn) return;
+            const name = btn.dataset.resetName;
+            if (confirm('Erase all scores for "' + name + '"? This cannot be undone.')) {
+                emitAdmin('admin_reset_player', { name: name });
+            }
+        });
+
+        // Per-player Reset uses event delegation (an inline onclick with a JSON
+        // name breaks on names containing quotes) — one handler for all rows.
+        document.querySelector('#players-table tbody').addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-reset-name]');
+            if (!btn) return;
+            const name = btn.dataset.resetName;
+            if (confirm('Erase all scores for "' + name + '"? This cannot be undone.')) {
+                emitAdmin('admin_reset_player', { name: name });
+            }
+        });
+
         socket.on('update_leaderboard', (board) => {
             document.getElementById('admin-board').innerHTML = board.map((row, i) =>
                 '<tr><td><span class="rank">' + (i + 1) + '</span></td>' +
@@ -262,7 +309,9 @@
         });
 
         socket.on('connect', () => {
-            // Re-auth automatically after a reconnect (PIN is still in the input)
+            // Silent re-auth after any reconnect — no PIN prompt on screen switches.
+            const saved = localStorage.getItem(ADMIN_SESSION_KEY);
+            if (saved) { adminLogin(saved); return; }
             if (authed) adminLogin();
         });
     </script>

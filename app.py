@@ -30,7 +30,13 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('TRIVIA_SECRET', 'bible-trivia-secret')
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
 
-ADMIN_PIN = os.environ.get('TRIVIA_ADMIN_PIN', '5364')
+# The admin PIN must come from the environment (Render dashboard / .env).
+# The fallback below is a dev-only placeholder — it is public (it lives in the
+# repo), so never rely on it for a deployed game.
+ADMIN_PIN = os.environ.get('TRIVIA_ADMIN_PIN', '000000')
+if 'TRIVIA_ADMIN_PIN' not in os.environ:
+    print('[bible-trivia] WARNING: TRIVIA_ADMIN_PIN is not set — using the '
+          'public dev PIN. Set it in your hosting dashboard!')
 # URL shown in the stage-display QR code. Set PUBLIC_JOIN_URL in Render to your
 # onrender.com address; the fallback below keeps local testing working.
 JOIN_URL = os.environ.get('PUBLIC_JOIN_URL', 'https://bible-trivia-3jke.onrender.com/')
@@ -278,6 +284,33 @@ timer_running = False
 state_lock = Lock()
 admins = set()                # sids authenticated as admin
 players = {}                  # sid -> name
+
+# ------------------------------------------------------------------
+# Sessions — let players and the admin survive page reloads / screen switches
+# (phone lock, ProPresenter web view refresh, Wi-Fi blips) without re-entering
+# their name or PIN. A random token is issued once, stored in localStorage,
+# and re-presented on reconnect.
+# ------------------------------------------------------------------
+import secrets as _secrets
+import hashlib as _hashlib
+
+player_tokens = {}            # token -> name
+admin_tokens = set()          # hashed admin session tokens
+admin_sid_tokens = {}         # socket sid -> that session's hashed admin token
+
+
+def _hash_token(token):
+    return _hashlib.sha256(token.encode()).hexdigest()
+
+
+def issue_player_token(name):
+    """Create a fresh rejoin token for a player and retire their old one(s),
+    so a name only has one live session."""
+    token = _secrets.token_urlsafe(24)
+    player_tokens[token] = name
+    for t in [t for t, n in player_tokens.items() if n == name and t != token]:
+        player_tokens.pop(t, None)
+    return token
 
 def public_question(q):
     return {"id": q["id"], "question": q["question"], "options": q["options"],
@@ -571,6 +604,21 @@ def handle_slide_shown(_data=None):
 # ------------------------------------------------------------------
 @socketio.on('login')
 def handle_login(data):
+    """Join with a name, or silently rejoin with a rejoin token saved in the
+    browser (survives phone lock, page reload, screen switching)."""
+    token = data.get('rejoin_token')
+    if token:
+        if token in player_tokens:
+            name = player_tokens[token]
+            players[request.sid] = name
+            reserve_name(name)
+            emit('login_ok', {'name': name, 'rejoin_token': token, 'rejoined': True})
+            _send_join_context(name)
+            return
+        # Stale token (e.g. an admin reset this player) — ask for the name again.
+        emit('login_error', {'message':
+            'Your session expired — enter your name to join again.'})
+        return
     name = (data.get('name') or 'Anonymous').strip()[:24] or 'Anonymous'
     # Names are unique (case-insensitive) so two people can't share a score.
     # Rejoining with your own current name is fine; resetting a player frees it.
@@ -580,7 +628,13 @@ def handle_login(data):
         return
     players[request.sid] = name
     reserve_name(name)
-    emit('login_ok', {})
+    new_token = issue_player_token(name)
+    emit('login_ok', {'name': name, 'rejoin_token': new_token})
+    _send_join_context(name)
+
+
+def _send_join_context(name):
+    """Everything a (re)joining player needs: scores and the live question."""
     daily, monthly = get_player_points(name)
     emit('score_update', {'daily': daily, 'monthly': monthly})
     push_leaderboard()
@@ -601,6 +655,17 @@ def handle_login(data):
     else:
         emit('game_status', {'active': False,
                              'message': 'The game is starting soon...'})
+
+
+@socketio.on('switch_player')
+def handle_switch_player(data):
+    """Explicitly leave a saved name (frees this browser for a new name).
+    Their scores stay — they just rejoin under a different name."""
+    token = data.get('rejoin_token')
+    if token in player_tokens:
+        player_tokens.pop(token, None)
+    players.pop(request.sid, None)
+    emit('switched_ok', {})
 
 @socketio.on('submit_answer')
 def handle_answer(data):
@@ -666,9 +731,21 @@ def admin_only(handler):
 
 @socketio.on('admin_login')
 def handle_admin_login(data):
-    if data.get('pin') == ADMIN_PIN:
+    token = data.get('session_token')
+    # Silent re-auth: a browser that already unlocked this session rejoins
+    # without the PIN (survives switching screens / reloading the tab).
+    if token and _hash_token(token) in admin_tokens:
         admins.add(request.sid)
-        emit('admin_ok', {})
+        admin_sid_tokens[request.sid] = _hash_token(token)
+        emit('admin_ok', {'session_token': token})
+        push_admin_state()
+        return
+    if data.get('pin') == ADMIN_PIN:
+        raw = _secrets.token_urlsafe(24)
+        admin_tokens.add(_hash_token(raw))
+        admin_sid_tokens[request.sid] = _hash_token(raw)
+        admins.add(request.sid)
+        emit('admin_ok', {'session_token': raw})
         push_admin_state()
     else:
         emit('admin_error', {'message': 'Wrong PIN.'})
@@ -762,9 +839,31 @@ def handle_admin_reset_player(data):
     with db() as conn:
         conn.execute("DELETE FROM answers WHERE LOWER(name)=LOWER(?)", (name,))
         conn.execute("DELETE FROM players WHERE LOWER(name)=LOWER(?)", (name,))
+    # Kill any live rejoin token for that name, so they truly start fresh.
+    for t in [t for t, n in player_tokens.items() if n.lower() == name.lower()]:
+        player_tokens.pop(t, None)
     # They may have answered the live question under that name — un-mark them.
     for qid, names in list(answered.items()):
         answered[qid] = {n for n in names if n.lower() != name.lower()}
+    socketio.emit('leaderboard_data', {
+        "daily": get_daily_board(), "monthly": get_monthly_board(),
+        "winner": get_month_winner(),
+        "month_label": datetime.now().strftime('%B %Y')})
+    push_leaderboard()
+    push_admin_state()
+
+
+@socketio.on('admin_reset_month')
+@admin_only
+def handle_admin_reset_month(_data):
+    """Reset the month: wipe this month's scores and question usage so the
+    boards start clean. Crowned champions in monthly_winners are kept as a
+    permanent record — use Fresh Start if you want everything gone."""
+    month = current_month()
+    with db() as conn:
+        conn.execute("DELETE FROM answers WHERE ts >= ?", (month + '-01',))
+        conn.execute("DELETE FROM used_questions WHERE month=?", (month,))
+    answered.clear()
     socketio.emit('leaderboard_data', {
         "daily": get_daily_board(), "monthly": get_monthly_board(),
         "winner": get_month_winner(),
@@ -779,6 +878,7 @@ def handle_admin_reset_all_scores(_data):
     with db() as conn:
         conn.execute("DELETE FROM answers")
         conn.execute("DELETE FROM players")
+    player_tokens.clear()
     answered.clear()
     push_leaderboard()
     push_admin_state()
@@ -809,13 +909,21 @@ def handle_admin_end_month(_data):
     else:
         emit('admin_error', {'message': 'No scores this month yet.'})
 
-# ------------------------------------------------------------------
-# Disconnect cleanup
-# ------------------------------------------------------------------
+@socketio.on('admin_logout')
+def handle_admin_logout(_data=None):
+    """Intentionally forget this browser's admin session: the dashboard locks
+    AND the session token is invalidated server-side (PIN required next time)."""
+    admins.discard(request.sid)
+    token_hash = admin_sid_tokens.pop(request.sid, None)
+    if token_hash:
+        admin_tokens.discard(token_hash)
+    emit('admin_logged_out', {})
+
 @socketio.on('disconnect')
 def handle_disconnect():
     players.pop(request.sid, None)
     admins.discard(request.sid)
+    admin_sid_tokens.pop(request.sid, None)
     push_admin_state()
 
 # ------------------------------------------------------------------

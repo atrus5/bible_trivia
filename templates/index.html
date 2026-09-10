@@ -38,6 +38,10 @@
                 <div id="options-container"></div>
                 <div class="feedback" id="feedback"></div>
                 <div id="next-note" class="muted" style="font-weight: 700; min-height: 20px;"></div>
+                <div style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center;">
+                    <span class="muted">Playing as <b id="my-name" style="color: var(--text);"></b></span>
+                    <a href="#" id="switch-player" style="font-size: 13px;">Switch player</a>
+                </div>
             </div>
 
             <div class="card" style="margin-top: 16px;">
@@ -63,6 +67,14 @@
         let pickedIndex = null;
         let timerTotal = 15;
         let revealed = false;
+        // Your session is remembered in this browser — a screen switch, phone
+        // lock, or reload puts you straight back into the game, no re-typing.
+        const NAME_KEY = 'trivia_name';
+        const TOKEN_KEY = 'trivia_token';
+        const savedToken = localStorage.getItem(TOKEN_KEY);
+        if (savedToken) {
+            socket.emit('login', { rejoin_token: savedToken });
+        }
 
         function setNextNote(secs) {
             const el = document.getElementById('next-note');
@@ -72,18 +84,47 @@
 
         function login() {
             const name = document.getElementById('username').value.trim() || 'Anonymous';
+            localStorage.removeItem(TOKEN_KEY);  // joining fresh replaces any saved session
             socket.emit('login', { name: name });
         }
         document.getElementById('username').addEventListener('keydown', e => {
             if (e.key === 'Enter') login();
         });
 
-        socket.on('login_ok', () => {
+        socket.on('login_ok', (s) => {
             document.getElementById('login-error').innerText = '';
             document.getElementById('login-form').style.display = 'none';
             document.getElementById('game-view').style.display = 'block';
+            if (s && s.rejoin_token) {
+                localStorage.setItem(TOKEN_KEY, s.rejoin_token);
+                localStorage.setItem(NAME_KEY, s.name || '');
+                document.getElementById('my-name').innerText = s.name || '';
+            }
         });
+        socket.on('switched_ok', () => {
+            localStorage.removeItem(TOKEN_KEY);
+            localStorage.removeItem(NAME_KEY);
+            showLoginForm();
+        });
+        document.getElementById('switch-player').addEventListener('click', (e) => {
+            e.preventDefault();
+            const token = localStorage.getItem(TOKEN_KEY);
+            if (token) {
+                socket.emit('switch_player', { rejoin_token: token });
+            } else {
+                showLoginForm();
+            }
+        });
+        function showLoginForm() {
+            document.getElementById('game-view').style.display = 'none';
+            document.getElementById('login-form').style.display = 'block';
+        }
         socket.on('login_error', (e) => {
+            localStorage.removeItem(TOKEN_KEY);
+            const savedName = localStorage.getItem(NAME_KEY);
+            if (savedName && !document.getElementById('username').value) {
+                document.getElementById('username').value = savedName;  // one-tap rejoin
+            }
             document.getElementById('login-error').innerText = e.message;
             document.getElementById('game-view').style.display = 'none';
             document.getElementById('login-form').style.display = 'block';
@@ -119,6 +160,7 @@
                 btn.innerHTML = '<span class="key">' + 'ABCD'[i] + '</span>' + opt;
                 btn.onclick = () => {
                     pickedIndex = i;
+                    [...container.children].forEach((b, j) => b.classList.toggle('picked', j === i));
                     socket.emit('submit_answer', { option: opt });
                     [...container.children].forEach(b => b.disabled = true);
                 };
