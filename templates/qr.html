@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bible Trivia — Join</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        :root {
+            --gold-2: #ffd97a;
+            --purple: #7c5cff;
+            --text: #f2f3fb;
+            --muted: #9aa0c3;
+        }
+        * { box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(1200px 600px at 85% -10%, rgba(124, 92, 255, 0.25), transparent 60%),
+                radial-gradient(900px 500px at -10% 110%, rgba(245, 185, 66, 0.15), transparent 55%),
+                #0f1220;
+        }
+        #join-box {
+            text-align: center;
+            padding: 2vh 2vw;
+            max-width: 92vw;
+        }
+        #join-box h1 {
+            margin: 0 0 2.2vh;
+            font-size: clamp(28px, 3.4vw, 62px);
+            font-weight: 800;
+            letter-spacing: 0.5px;
+        }
+        #qr-card {
+            display: inline-block;
+            background: #fff;
+            padding: clamp(12px, 1.8vh, 24px);
+            border-radius: 24px;
+            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.45);
+        }
+        #qr-card img { display: block; width: min(62vh, 60vw); height: auto; }
+        #url {
+            margin-top: 2.4vh;
+            font-size: clamp(20px, 2.4vw, 44px);
+            font-weight: 700;
+            color: var(--gold-2);
+            word-break: break-all;
+        }
+        #hint {
+            margin-top: 1.2vh;
+            font-size: clamp(14px, 1.3vw, 24px);
+            color: var(--muted);
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+    <div id="join-box">
+        <h1>📱 Scan to Play Bible Trivia</h1>
+        <div id="qr-card"><div id="qr"></div></div>
+        <div id="url">{{ join_url }}</div>
+        <div id="hint">Point your phone's camera at the code — no app needed.</div>
+    </div>
+    <script>
+        new QRCode(document.getElementById('qr'), {
+            text: {{ join_url | tojson }},
+            width: 1024,
+            height: 1024,
+            colorDark: '#0f1220',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.M
+        });
+    </script>
+</body>
+</html>

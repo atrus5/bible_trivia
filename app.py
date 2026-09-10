@@ -553,6 +553,12 @@ def index():
 def display():
     return render_template('display.html', join_url=JOIN_URL)
 
+@app.route('/qr')
+def qr():
+    # Standalone join screen: just the QR code and the address, for use as its
+    # own ProPresenter slide.
+    return render_template('qr.html', join_url=JOIN_URL)
+
 @app.route('/admin')
 def admin():
     return render_template('admin.html', pin_length=len(ADMIN_PIN))
