@@ -24,7 +24,7 @@
   {"difficulty": "easy", "question": "What food did God rain down for the Israelites in the wilderness?", "options": ["Figs", "Manna", "Barley", "Dates"], "answer": "Manna", "reference": "Exodus 16"},
   {"difficulty": "easy", "question": "Who succeeded Moses as leader of Israel?", "options": ["Caleb", "Aaron", "Joshua", "Samuel"], "answer": "Joshua", "reference": "Joshua 1:1-2"},
   {"difficulty": "easy", "question": "The walls of which city fell after Israel marched around it?", "options": ["Ai", "Jericho", "Hebron", "Gibeon"], "answer": "Jericho", "reference": "Joshua 6:20"},
-  {"difficulty": "easy", "question": "Who was the strongman in the book of Judges?", "options": ["Samson", "Gideon", "Eli", "Jephthah"], "answer": "Samson", "reference": "Judges 13-16"},
+  {"difficulty": "easy", "question": "Who was the strongman whose strength came from God?", "options": ["Samson", "Gideon", "Eli", "Jephthah"], "answer": "Samson", "reference": "Judges 13-16"},
   {"difficulty": "easy", "question": "What is the first book of the New Testament?", "options": ["Mark", "Acts", "Matthew", "Romans"], "answer": "Matthew", "reference": "Matthew 1:1"},
   {"difficulty": "easy", "question": "Who wrote the four Gospels?", "options": ["Matthew, Mark, Luke, and John", "Peter, Paul, James, and John", "Moses, David, Isaiah, and Daniel", "Matthew, Thomas, Simon, and Jude"], "answer": "Matthew, Mark, Luke, and John", "reference": "The four Gospels"},
   {"difficulty": "easy", "question": "Who was the mother of Jesus?", "options": ["Mary", "Martha", "Elizabeth", "Anna"], "answer": "Mary", "reference": "Luke 1:30-31"},
