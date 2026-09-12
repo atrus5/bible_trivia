@@ -4,9 +4,9 @@ A real-time Bible trivia game built to run inside **ProPresenter** (web embed), 
 
 ## Included Files
 - `app.py`: Flask-SocketIO backend — SQLite persistence, auto-play cycling, monthly question tracking, reveal-answer flow, admin events.
-- `data/questions_easy.json`: 80 easy questions.
-- `data/questions_medium.json`: 60 medium questions.
-- `data/questions_hard.json`: 60 hard questions.
+- `data/questions_easy.json`: 240 easy questions.
+- `data/questions_medium.json`: 180 medium questions.
+- `data/questions_hard.json`: 180 hard questions.
 - `templates/index.html`: Player interface (phones).
 - `templates/display.html`: Stage display for ProPresenter.
 - `templates/admin.html`: Admin dashboard (host control).
@@ -14,8 +14,34 @@ A real-time Bible trivia game built to run inside **ProPresenter** (web embed), 
 - `static/style.css`: Shared purple & gold theme.
 - `requirements.txt`: Python dependencies.
 - `validate.py`: Dev tool — checks all questions have 4 options, a valid answer, no duplicates.
+- `add_questions.py`: Dev tool — validates and merges a batch of new questions into the banks.
 
 Run `python validate.py` after editing the JSON question banks.
+
+### Adding Questions
+The banks hold **600 questions** (240 easy / 180 medium / 180 hard) and are the only
+source of content, so growing them is a two-step job. Put a batch in a `.json` (or
+`.py`) file shaped like this:
+
+```json
+{
+  "easy":   [{"question": "...", "options": ["A", "B", "C", "D"], "answer": "A", "reference": "Genesis 1:1"}],
+  "medium": [],
+  "hard":   []
+}
+```
+
+Then merge it (a flat list of questions each tagged with a `difficulty` works too):
+
+```bash
+python add_questions.py new_batch.json --dry-run   # check first, writes nothing
+python add_questions.py new_batch.json             # merge
+python validate.py                                 # final sanity check
+```
+
+The tool refuses to write anything if the batch has a duplicate question (against
+the existing banks or within itself), a bad answer, duplicate options, a missing
+option, or text over the length limits — so a bad batch can never corrupt the banks.
 
 ## How to Run
 1. Install dependencies:
@@ -97,7 +123,7 @@ Notes:
 ## Question Rules
 - Questions are picked **randomly**, per difficulty tier
 - **No question repeats within a calendar month** (tracked in the DB; survives restarts)
-- If a tier runs out mid-month (e.g., all 30 hard questions used), the picker falls back to the other tiers; the month's usage clears on the 1st
+- If a tier runs out mid-month (e.g., all 180 hard questions used), the picker falls back to the other tiers; the month's usage clears on the 1st
 
 ## Persistence (survives restarts)
 - All answers, scores, daily/monthly boards, and the monthly winner
