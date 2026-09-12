@@ -74,7 +74,7 @@
         #leader-strip b { color: var(--gold-2); }
         #leader-strip .muted { font-size: clamp(11px, 0.9vw, 14px); }
         #leader-strip { font-size: clamp(13px, 1.1vw, 18px); gap: 2vw; padding: 1.2vh; }
-        #status-msg { font-size: clamp(28px, 2.6vw, 48px); font-weight: 800; text-align: center; margin-top: 6vh; }
+        #status-msg { font-size: clamp(28px, 2.6vw, 48px); font-weight: 800; text-align: center; margin-top: 2.4vh; }
         #next-note { font-size: clamp(16px, 1.4vw, 26px) !important; margin-top: 1.8vh !important; }
         /* Join-by-QR (pre-game + corner during play) — sizes bumped for
            readability from the back rows */
@@ -92,12 +92,20 @@
             border-radius: 24px;
             box-shadow: 0 12px 48px rgba(0, 0, 0, 0.45);
         }
+        /* QR canvas is rendered at 1024px and scaled with viewport units so it
+           fills the projector: on a 1920x1080 screen this is a ~691px square. */
+        #join-qr #qr-big img,
+        #join-qr #qr-big canvas {
+            width: min(64vh, 42vw) !important;
+            height: auto !important;
+            display: block;
+        }
         #join-qr .qr-title { font-size: clamp(34px, 3vw, 56px); font-weight: 800; }
         #join-qr .qr-url { color: var(--muted); font-size: clamp(18px, 1.6vw, 30px); max-width: 60vw; word-break: break-all; }
         #corner-qr {
             position: fixed;
-            right: 28px;
-            bottom: 96px;
+            right: 24px;
+            bottom: 92px;
             z-index: 20;
             text-align: center;
             display: none;
@@ -105,13 +113,20 @@
         #corner-qr .qr-card {
             display: inline-block;
             background: #fff;
-            padding: 14px;
+            padding: 16px;
             border-radius: 16px;
             box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
         }
+        /* Corner QR stays clear of the option grid on a 1920-wide screen */
+        #corner-qr #qr-small img,
+        #corner-qr #qr-small canvas {
+            width: 260px !important;
+            height: auto !important;
+            display: block;
+        }
         #corner-qr .qr-label {
             margin-top: 8px;
-            font-size: 20px;
+            font-size: 24px;
             font-weight: 700;
             color: var(--gold-2);
         }
@@ -171,8 +186,9 @@
                 correctLevel: QRCode.CorrectLevel.M
             });
         }
-        buildQR('qr-big', 560);
-        buildQR('qr-small', 190);
+        // Render at high resolution; CSS scales to the projector size so it stays crisp
+        buildQR('qr-big', 1024);
+        buildQR('qr-small', 520);
 
         // Slide mode: tell the server every time ProPresenter shows this slide.
         // On each appearance it starts exactly one new question (server debounced).

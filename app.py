@@ -31,12 +31,12 @@ app.config['SECRET_KEY'] = os.environ.get('TRIVIA_SECRET', 'bible-trivia-secret'
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
 
 # The admin PIN must come from the environment (Render dashboard / .env).
-# The fallback below is a dev-only placeholder — it is public (it lives in the
-# repo), so never rely on it for a deployed game.
-ADMIN_PIN = os.environ.get('TRIVIA_ADMIN_PIN', '000000')
-if 'TRIVIA_ADMIN_PIN' not in os.environ:
-    print('[bible-trivia] WARNING: TRIVIA_ADMIN_PIN is not set — using the '
-          'public dev PIN. Set it in your hosting dashboard!')
+# There is deliberately NO fallback: if it is unset, admin login is refused
+# (fail-closed). A PIN written in code would be public — the repo is public.
+ADMIN_PIN = os.environ.get('TRIVIA_ADMIN_PIN') or None
+if ADMIN_PIN is None:
+    print('[bible-trivia] WARNING: TRIVIA_ADMIN_PIN is not set — the admin '
+          'dashboard is LOCKED until you set it in your hosting dashboard!')
 # URL shown in the stage-display QR code. Set PUBLIC_JOIN_URL in Render to your
 # onrender.com address; the fallback below keeps local testing working.
 JOIN_URL = os.environ.get('PUBLIC_JOIN_URL', 'https://bible-trivia-3jke.onrender.com/')
@@ -561,7 +561,7 @@ def qr():
 
 @app.route('/admin')
 def admin():
-    return render_template('admin.html', pin_length=len(ADMIN_PIN))
+    return render_template('admin.html', pin_length=len(ADMIN_PIN or ''))
 
 @app.route('/leaderboard')
 def leaderboard():
@@ -770,13 +770,18 @@ def handle_admin_login(data):
         emit('admin_ok', {'session_token': token})
         push_admin_state()
         return
-    if data.get('pin') == ADMIN_PIN:
+    if data.get('pin') == ADMIN_PIN and ADMIN_PIN is not None:
         raw = _secrets.token_urlsafe(24)
         admin_tokens.add(_hash_token(raw))
         admin_sid_tokens[request.sid] = _hash_token(raw)
         admins.add(request.sid)
+        _persist_sessions()   # new admin session survives a redeploy
         emit('admin_ok', {'session_token': raw})
         push_admin_state()
+    elif ADMIN_PIN is None:
+        emit('admin_error', {'message':
+             'Admin PIN is not configured. Set TRIVIA_ADMIN_PIN in your '
+             'hosting dashboard (Render → Environment), then reload this page.'})
     else:
         emit('admin_error', {'message': 'Wrong PIN.'})
 
@@ -968,6 +973,7 @@ def handle_admin_logout(_data=None):
     token_hash = admin_sid_tokens.pop(request.sid, None)
     if token_hash:
         admin_tokens.discard(token_hash)
+        _persist_sessions()   # a locked session must not resurrect on restart
     emit('admin_logged_out', {})
 
 @socketio.on('disconnect')
