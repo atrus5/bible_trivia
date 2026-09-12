@@ -31,7 +31,7 @@ MAX_QUESTION = 140
 MAX_OPTION = 60
 
 
-def _load_input(path):
+def load_input(path):
     """Return {tier: [question, ...]} from a .json or .py file."""
     if path.endswith('.py'):
         spec = importlib.util.spec_from_file_location('_new_questions', path)
@@ -59,7 +59,7 @@ def _load_input(path):
     return normalized
 
 
-def _load_banks(data_dir):
+def load_banks(data_dir):
     banks = {}
     for tier, fname in FILES.items():
         path = os.path.join(data_dir, fname)
@@ -68,7 +68,7 @@ def _load_banks(data_dir):
     return banks
 
 
-def _validate(banks, incoming):
+def validate_batch(banks, incoming):
     """Return a list of human-readable problems (empty means safe to write)."""
     problems = []
     seen = {}
@@ -103,7 +103,7 @@ def _validate(banks, incoming):
     return problems
 
 
-def _append(banks, incoming, data_dir):
+def append_batch(banks, incoming, data_dir):
     changed = {}
     for tier, fname in FILES.items():
         items = banks[tier] + [dict(difficulty=tier, **item) for item in incoming[tier]]
@@ -128,16 +128,16 @@ def main():
     args = parser.parse_args()
 
     try:
-        incoming = _load_input(args.input)
+        incoming = load_input(args.input)
     except Exception as e:
         print(f"Could not read {args.input}: {e}")
         return 1
 
-    banks = _load_banks(args.data_dir)
+    banks = load_banks(args.data_dir)
     counts = ', '.join(f"{tier} {len(incoming[tier])}" for tier in TIERS)
     print(f"New questions: {counts}")
 
-    problems = _validate(banks, incoming)
+    problems = validate_batch(banks, incoming)
     if problems:
         print("\nREFUSING TO WRITE — problems found:")
         for p in problems:
@@ -148,7 +148,7 @@ def main():
         print("\nNo problems found. ✅  (dry run — nothing written)")
         return 0
 
-    changed = _append(banks, incoming, args.data_dir)
+    changed = append_batch(banks, incoming, args.data_dir)
     for tier, (before, after) in changed.items():
         print(f"{FILES[tier]}: {before} -> {after} questions")
     total = sum(after for _, after in changed.values())

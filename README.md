@@ -4,9 +4,10 @@ A real-time Bible trivia game built to run inside **ProPresenter** (web embed), 
 
 ## Included Files
 - `app.py`: Flask-SocketIO backend — SQLite persistence, auto-play cycling, monthly question tracking, reveal-answer flow, admin events.
-- `data/questions_easy.json`: 240 easy questions.
-- `data/questions_medium.json`: 180 medium questions.
-- `data/questions_hard.json`: 180 hard questions.
+- `data/questions_easy.json`: 320 easy questions.
+- `data/questions_medium.json`: 240 medium questions.
+- `data/questions_hard.json`: 240 hard questions.
+- `data/reserve_questions.json`: unused questions the generator draws from.
 - `templates/index.html`: Player interface (phones).
 - `templates/display.html`: Stage display for ProPresenter.
 - `templates/admin.html`: Admin dashboard (host control).
@@ -15,13 +16,29 @@ A real-time Bible trivia game built to run inside **ProPresenter** (web embed), 
 - `requirements.txt`: Python dependencies.
 - `validate.py`: Dev tool — checks all questions have 4 options, a valid answer, no duplicates.
 - `add_questions.py`: Dev tool — validates and merges a batch of new questions into the banks.
+- `generate_questions.py`: Dev tool — `--total N` adds N questions, split across tiers.
 
 Run `python validate.py` after editing the JSON question banks.
 
 ### Adding Questions
-The banks hold **600 questions** (240 easy / 180 medium / 180 hard) and are the only
-source of content, so growing them is a two-step job. Put a batch in a `.json` (or
-`.py`) file shaped like this:
+To add a batch, just give the total you want:
+
+```bash
+python generate_questions.py --total 200   # adds ~80 easy / 60 medium / 60 hard
+python validate.py                         # final check
+```
+
+The split follows the same 4:3:3 ratio the banks were built with (e.g. 200 →
+80/60/60), and questions are pulled from `data/reserve_questions.json`. Anything
+already in the banks is skipped automatically, so repeat runs never duplicate. If
+the reserve can't cover the request, it prints how many are left and writes
+nothing. When the reserve runs low, add more question objects to that file (or
+point `--reserve` at a directory of pool files) and run it again.
+
+The banks currently hold **800 questions** (320 easy / 240 medium / 240 hard).
+
+To merge a specific hand-written batch instead, use `add_questions.py` with a file
+shaped like this:
 
 ```json
 {
@@ -123,7 +140,7 @@ Notes:
 ## Question Rules
 - Questions are picked **randomly**, per difficulty tier
 - **No question repeats within a calendar month** (tracked in the DB; survives restarts)
-- If a tier runs out mid-month (e.g., all 180 hard questions used), the picker falls back to the other tiers; the month's usage clears on the 1st
+- If a tier runs out mid-month (e.g., all 240 hard questions used), the picker falls back to the other tiers; the month's usage clears on the 1st
 
 ## Persistence (survives restarts)
 - All answers, scores, daily/monthly boards, and the monthly winner

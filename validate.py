@@ -42,7 +42,7 @@ for fname in ['questions_easy.json', 'questions_medium.json', 'questions_hard.js
                 problems.append(f"duplicate question: {fname}[{i}] == {seen[key]}")
             seen[key] = f"{fname}[{i}]"
 
-print(f"\nTOTAL: {total} questions (target: 600)")
+print(f"\nTOTAL: {total} questions (target: 800)")
 print("PROBLEMS:" if problems else "No problems found. ✅")
 for p in problems:
     print("  -", p)
