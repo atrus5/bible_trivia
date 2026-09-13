@@ -437,7 +437,7 @@ def start_next_question():
     game["next_question_at"] = None
     game["paused"] = False
     answered[q["id"]] = set()
-    socketio.emit('game_status', {'active': True})
+    socketio.emit('game_status', {'active': True, 'paused': game["paused"]})
     socketio.emit('new_question', public_question(q))
     start_timer()
     push_admin_state()
@@ -538,7 +538,8 @@ def reset_game():
     game["paused"] = False
     answered.clear()
     socketio.emit('game_status', {'active': False,
-                                  'message': 'The game is starting soon...'})
+                                  'message': 'The game is starting soon...',
+                                  'paused': game["paused"]})
     push_admin_state()
     save_state()
 
@@ -584,7 +585,7 @@ def propresenter_start():
 @socketio.on('connect')
 def handle_connect():
     if game["active"] and game["question"]:
-        emit('game_status', {'active': True})
+        emit('game_status', {'active': True, 'paused': game["paused"]})
         emit('new_question', public_question(game["question"]))
         emit('timer_tick', {'time_left': timer_seconds, 'active': timer_running,
                             'total': game.get("timer_seconds", DEFAULT_TIMER),
@@ -600,7 +601,8 @@ def handle_connect():
                 emit('next_question_countdown', {"seconds": next_in})
     else:
         emit('game_status', {'active': False,
-                             'message': 'The game is starting soon...'})
+                             'message': 'The game is starting soon...',
+                             'paused': game["paused"]})
 
 # ------------------------------------------------------------------
 # ProPresenter slide mode: exactly one question per slide appearance
@@ -662,7 +664,7 @@ def _send_join_context(name):
     push_leaderboard()
     push_admin_state()
     if game["active"] and game["question"]:
-        emit('game_status', {'active': True})
+        emit('game_status', {'active': True, 'paused': game["paused"]})
         emit('new_question', public_question(game["question"]))
         emit('timer_tick', {'time_left': timer_seconds, 'active': timer_running,
                             'total': game.get("timer_seconds", DEFAULT_TIMER),
@@ -676,7 +678,8 @@ def _send_join_context(name):
                                    "next_in": next_in})
     else:
         emit('game_status', {'active': False,
-                             'message': 'The game is starting soon...'})
+                             'message': 'The game is starting soon...',
+                             'paused': game["paused"]})
 
 
 @socketio.on('switch_player')
@@ -962,7 +965,8 @@ def handle_admin_reset_month_winner(_data):
     # send it back to the pregame view.
     if not game["active"]:
         socketio.emit('game_status', {'active': False,
-                                      'message': 'The game is starting soon...'})
+                                      'message': 'The game is starting soon...',
+                                      'paused': game["paused"]})
     push_admin_state()
 
 @socketio.on('admin_logout')

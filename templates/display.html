@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="/static/style.css">
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         /* Big-screen tweaks for ProPresenter output.
            Sizes use vw/clamp so everything fits on any projector — nothing
@@ -76,72 +75,44 @@
         #leader-strip { font-size: clamp(13px, 1.1vw, 18px); gap: 2vw; padding: 1.2vh; }
         #status-msg { font-size: clamp(28px, 2.6vw, 48px); font-weight: 800; text-align: center; margin-top: 2.4vh; }
         #next-note { font-size: clamp(16px, 1.4vw, 26px) !important; margin-top: 1.8vh !important; }
-        /* Join-by-QR (pre-game + corner during play) — sizes bumped for
-           readability from the back rows */
-        #pregame-view { text-align: center; }
-        #join-qr {
+        /* Pregame: just a centered status message — the /qr slide handles
+           the join code on its own */
+        #pregame-view {
+            text-align: center;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 1.8vh;
-            margin-top: 4vh;
+            justify-content: center;
+            min-height: 88vh;
         }
-        #join-qr .qr-card {
-            background: #fff;
-            padding: 24px;
-            border-radius: 24px;
-            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.45);
-        }
-        /* QR canvas is rendered at 1024px and scaled with viewport units so it
-           fills the projector: on a 1920x1080 screen this is a ~691px square. */
-        #join-qr #qr-big img,
-        #join-qr #qr-big canvas {
-            width: min(64vh, 42vw) !important;
-            height: auto !important;
-            display: block;
-        }
-        #join-qr .qr-title { font-size: clamp(34px, 3vw, 56px); font-weight: 800; }
-        #join-qr .qr-url { color: var(--muted); font-size: clamp(18px, 1.6vw, 30px); max-width: 60vw; word-break: break-all; }
-        #corner-qr {
-            position: fixed;
-            right: 24px;
-            bottom: 92px;
-            z-index: 20;
-            text-align: center;
+        /* Paused: full-screen message so the room knows the game is held */
+        #pause-view {
             display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 88vh;
+            text-align: center;
         }
-        #corner-qr .qr-card {
-            display: inline-block;
-            background: #fff;
-            padding: 16px;
-            border-radius: 16px;
-            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
-        }
-        /* Corner QR stays clear of the option grid on a 1920-wide screen */
-        #corner-qr #qr-small img,
-        #corner-qr #qr-small canvas {
-            width: 260px !important;
-            height: auto !important;
-            display: block;
-        }
-        #corner-qr .qr-label {
-            margin-top: 8px;
-            font-size: 24px;
-            font-weight: 700;
+        #pause-view .pause-title { font-size: clamp(48px, 5vw, 96px); font-weight: 800; }
+        #pause-view .pause-sub {
+            font-size: clamp(24px, 2.2vw, 40px);
             color: var(--gold-2);
+            font-weight: 700;
+            margin-top: 2vh;
         }
     </style>
 </head>
 <body>
     <div id="stage">
         <div id="pregame-view">
-        <div id="join-qr">
-            <div class="qr-card"><div id="qr-big"></div></div>
-            <div class="qr-title">Scan to Play 📱</div>
-            <div class="qr-url">{{ join_url }}</div>
-        </div>
         <div id="status-msg">The game is starting soon... 📖</div>
     </div>
+
+        <div id="pause-view">
+            <div class="pause-title">⏸️ Game Paused</div>
+            <div class="pause-sub">We'll start again shortly…</div>
+        </div>
 
         <div id="question-view" style="display: none;">
             <div class="timer-wrap" style="max-width: 860px;">
@@ -154,11 +125,6 @@
             <div id="reveal-ref"></div>
             <div id="next-note" style="font-size: 24px; margin-top: 14px; color: var(--gold-2); font-weight: 700;"></div>
         </div>
-    </div>
-
-    <div id="corner-qr">
-        <div class="qr-card"><div id="qr-small"></div></div>
-        <div class="qr-label">Join 📱</div>
     </div>
 
     <div id="leader-strip" style="display: none;">
@@ -174,22 +140,6 @@
         // Auto-start: when ProPresenter shows this web view, begin the game
         fetch('/propresenter_start');
 
-        // ---- Join-by-QR -------------------------------------------------
-        const joinUrl = {{ join_url | tojson }};
-        function buildQR(elId, size) {
-            new QRCode(document.getElementById(elId), {
-                text: joinUrl,
-                width: size,
-                height: size,
-                colorDark: '#0f1220',
-                colorLight: '#ffffff',
-                correctLevel: QRCode.CorrectLevel.M
-            });
-        }
-        // Render at high resolution; CSS scales to the projector size so it stays crisp
-        buildQR('qr-big', 1024);
-        buildQR('qr-small', 520);
-
         // Slide mode: tell the server every time ProPresenter shows this slide.
         // On each appearance it starts exactly one new question (server debounced).
         function notifySlideShown() { socket.emit('slide_shown'); }
@@ -198,26 +148,52 @@
             if (!document.hidden) notifySlideShown();
         });
 
-        function showPregame(joinVisible) {
-            document.getElementById('question-view').style.display = 'none';
-            document.getElementById('pregame-view').style.display = 'block';
-            document.getElementById('join-qr').style.display = joinVisible ? 'flex' : 'none';
-            document.getElementById('corner-qr').style.display = 'none';
-            document.getElementById('leader-strip').style.display = 'none';
+        // One place decides which view is on screen, so pausing can restore
+        // exactly what was showing before the pause (question or pregame).
+        let currentView = 'pregame';
+        let viewBeforePause = 'pregame';
+
+        function renderView() {
+            document.getElementById('pregame-view').style.display = currentView === 'pregame' ? 'flex' : 'none';
+            document.getElementById('question-view').style.display = currentView === 'question' ? 'block' : 'none';
+            document.getElementById('pause-view').style.display = currentView === 'pause' ? 'flex' : 'none';
+            document.getElementById('leader-strip').style.display = currentView === 'question' ? 'flex' : 'none';
+        }
+
+        function showPregame() {
+            if (currentView === 'pause') { viewBeforePause = 'pregame'; return; }
+            currentView = 'pregame';
+            renderView();
         }
 
         function showQuestionView() {
-            document.getElementById('pregame-view').style.display = 'none';
-            document.getElementById('question-view').style.display = 'block';
-            document.getElementById('corner-qr').style.display = 'block';
-            document.getElementById('leader-strip').style.display = 'flex';
- }
+            if (currentView === 'pause') { viewBeforePause = 'question'; return; }
+            currentView = 'question';
+            renderView();
+        }
+
+        function showPauseView() {
+            if (currentView === 'pause') return;
+            viewBeforePause = currentView;
+            currentView = 'pause';
+            renderView();
+        }
+
+        function hidePauseView() {
+            if (currentView !== 'pause') return;
+            currentView = viewBeforePause;
+            renderView();
+        }
 
         socket.on('game_status', (status) => {
+            if (status.paused) {
+                showPauseView();
+                return;
+            }
             if (!status.active) {
                 document.getElementById('status-msg').innerText =
                     (status.message || 'The game is starting soon...') + ' 📖';
-                showPregame(true);
+                showPregame();
             }
         });
 
@@ -245,10 +221,10 @@
             const num = document.getElementById('big-timer');
             const fill = document.getElementById('timer-fill');
             if (data.paused) {
-                num.innerText = '⏸ PAUSED';
-                num.className = '';
+                showPauseView();
                 return;
             }
+            hidePauseView();
             num.innerText = data.active ? data.time_left : "TIME'S UP!";
             num.className = data.time_left <= 5 && data.active ? 'warn' : '';
             fill.style.width = Math.max(0, (data.time_left / total) * 100) + '%';
@@ -275,8 +251,11 @@
         socket.on('next_question_countdown', (d) => setNextNote(d.seconds));
         socket.on('new_question', () => setNextNote(0));
         socket.on('game_paused', (d) => {
-            document.getElementById('next-note').innerText =
-                d.paused ? '⏸️ Game paused by host' : '';
+            if (d.paused) {
+                showPauseView();
+            } else {
+                hidePauseView();
+            }
         });
 
         socket.on('update_leaderboard', (board) => {
@@ -294,7 +273,7 @@
             document.getElementById('status-msg').innerHTML =
                 '👑 ' + w.month_label + ' Champion<br><span style="font-size:64px; color: var(--gold-2);">' +
                 w.name + '</span><br><span class="muted" style="font-size:26px;">' + w.points + ' points</span>';
-            showPregame(false);
+            showPregame();
         });
     </script>
 </body>
