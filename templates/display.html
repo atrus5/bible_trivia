@@ -157,7 +157,7 @@
             document.getElementById('pregame-view').style.display = currentView === 'pregame' ? 'flex' : 'none';
             document.getElementById('question-view').style.display = currentView === 'question' ? 'block' : 'none';
             document.getElementById('pause-view').style.display = currentView === 'pause' ? 'flex' : 'none';
-            document.getElementById('leader-strip').style.display = currentView === 'question' ? 'flex' : 'none';
+            document.getElementById('leader-strip').style.display = currentView === 'question' || currentView === 'pause' ? 'flex' : 'none';
         }
 
         function showPregame() {

@@ -7,6 +7,8 @@ import math
 import time
 import random
 import sqlite3
+import secrets as _secrets
+import hmac as _hmac
 from datetime import datetime
 from threading import Lock
 
@@ -27,7 +29,10 @@ except ImportError:
     pass
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('TRIVIA_SECRET', 'bible-trivia-secret')
+# Flask's own session machinery is not used (auth is the custom token system
+# below), so a per-boot random key is safe — and avoids shipping a public
+# fallback secret in a public repo.
+app.config['SECRET_KEY'] = os.environ.get('TRIVIA_SECRET') or _secrets.token_hex(32)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
 
 # The admin PIN must come from the environment (Render dashboard / .env).
@@ -273,7 +278,6 @@ players = {}                  # sid -> name
 # their name or PIN. A random token is issued once, stored in localStorage,
 # and re-presented on reconnect.
 # ------------------------------------------------------------------
-import secrets as _secrets
 import hashlib as _hashlib
 
 player_tokens = {}            # token -> name
@@ -562,7 +566,7 @@ def qr():
 
 @app.route('/admin')
 def admin():
-    return render_template('admin.html', pin_length=len(ADMIN_PIN or ''))
+    return render_template('admin.html')
 
 @app.route('/leaderboard')
 def leaderboard():
@@ -584,6 +588,8 @@ def propresenter_start():
 # ------------------------------------------------------------------
 @socketio.on('connect')
 def handle_connect():
+    # Every screen (display, players) starts with the current daily board
+    emit('update_leaderboard', get_daily_board())
     if game["active"] and game["question"]:
         emit('game_status', {'active': True, 'paused': game["paused"]})
         emit('new_question', public_question(game["question"]))
@@ -762,8 +768,49 @@ def admin_only(handler):
     wrapped.__name__ = handler.__name__
     return wrapped
 
+# Brute-force protection for admin login: after MAX wrong PIN attempts the
+# client is locked out for a cooldown window. (A 4-digit PIN alone could
+# otherwise be guessed in seconds.)
+PIN_ATTEMPT_LIMIT = 5
+PIN_LOCKOUT_SECONDS = 300   # 5 minutes
+_pin_attempts = {}
+
+
+def _pin_lockout_remaining(ip):
+    """Seconds left in lockout for this client (0 = not locked)."""
+    until = _pin_attempts.get(ip, {}).get('locked_until', 0)
+    return max(0, int(until - time.time()))
+
+
+def _record_pin_failure(ip):
+    rec = _pin_attempts.setdefault(ip, {'fails': 0, 'locked_until': 0})
+    rec['fails'] += 1
+    if rec['fails'] >= PIN_ATTEMPT_LIMIT:
+        rec['locked_until'] = time.time() + PIN_LOCKOUT_SECONDS
+        rec['fails'] = 0
+        return True   # just locked
+    return False
+
+
+def _clear_pin_failures(ip):
+    _pin_attempts.pop(ip, None)
+
+
 @socketio.on('admin_login')
 def handle_admin_login(data):
+    # Attribute attempts to the client IP so a bad actor can't sidestep the
+    # lockout by reconnecting (each reconnect gets a fresh sid).
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr or '?')
+    ip = ip.split(',')[0].strip()
+
+    remaining = _pin_lockout_remaining(ip)
+    if remaining:
+        emit('admin_error', {'message':
+             'Too many wrong PIN attempts. Try again in %d min %d sec.'
+             % (remaining // 60, remaining % 60)}
+            )
+        return
+
     token = data.get('session_token')
     # Silent re-auth: a browser that already unlocked this session rejoins
     # without the PIN (survives switching screens / reloading the tab).
@@ -773,7 +820,16 @@ def handle_admin_login(data):
         emit('admin_ok', {'session_token': token})
         push_admin_state()
         return
-    if data.get('pin') == ADMIN_PIN and ADMIN_PIN is not None:
+    if ADMIN_PIN is None:
+        emit('admin_error', {'message':
+             'Admin PIN is not configured. Set TRIVIA_ADMIN_PIN in your '
+             'hosting dashboard (Render → Environment), then reload this page.'})
+        return
+
+    # Constant-time comparison so response timing can't hint at the PIN;
+    # wrong guesses count toward this IP's lockout.
+    if _hmac.compare_digest(str(data.get('pin') or ''), str(ADMIN_PIN)):
+        _clear_pin_failures(ip)
         raw = _secrets.token_urlsafe(24)
         admin_tokens.add(_hash_token(raw))
         admin_sid_tokens[request.sid] = _hash_token(raw)
@@ -781,12 +837,15 @@ def handle_admin_login(data):
         _persist_sessions()   # new admin session survives a redeploy
         emit('admin_ok', {'session_token': raw})
         push_admin_state()
-    elif ADMIN_PIN is None:
-        emit('admin_error', {'message':
-             'Admin PIN is not configured. Set TRIVIA_ADMIN_PIN in your '
-             'hosting dashboard (Render → Environment), then reload this page.'})
     else:
-        emit('admin_error', {'message': 'Wrong PIN.'})
+        just_locked = _record_pin_failure(ip)
+        if just_locked:
+            msg = ('Too many wrong PIN attempts. Locked for %d minutes.'
+                   % (PIN_LOCKOUT_SECONDS // 60))
+        else:
+            left = PIN_ATTEMPT_LIMIT - _pin_attempts.get(ip, {}).get('fails', 0)
+            msg = 'Wrong PIN. %d attempt%s left before lockout.' % (left, '' if left == 1 else 's')
+        emit('admin_error', {'message': msg})
 
 @socketio.on('admin_start')
 @admin_only
