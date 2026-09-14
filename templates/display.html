@@ -13,6 +13,7 @@
             max-width: 1400px;
             margin: 0 auto;
             padding: 3vh 3vw;
+            visibility: hidden;
         }
         #question-view {
             display: none;
@@ -127,7 +128,7 @@
         </div>
     </div>
 
-    <div id="leader-strip" style="display: none;">
+    <div id="leader-strip" style="display: none; visibility: hidden;">
         <span class="muted">🏆 Today's Top 3:</span>
         <span id="leader-1"></span>
         <span id="leader-2"></span>
@@ -135,10 +136,11 @@
     </div>
 
     <script>
-        const socket = io();
+        const socket = io({ query: { display: 'stage' } });
 
-        // Auto-start: when ProPresenter shows this web view, begin the game
-        fetch('/propresenter_start');
+        // ProPresenter activation is reported by the slide_shown event below.
+        // Do not make a separate HTTP request here: it races the Socket.IO
+        // state sync and can make an old question flash before the new one.
 
         // Slide mode: tell the server every time ProPresenter shows this slide.
         // On each appearance it starts exactly one new question (server debounced).
@@ -154,6 +156,8 @@
         let viewBeforePause = 'pregame';
 
         function renderView() {
+            document.getElementById('stage').style.visibility = 'visible';
+            document.getElementById('leader-strip').style.visibility = 'visible';
             document.getElementById('pregame-view').style.display = currentView === 'pregame' ? 'flex' : 'none';
             document.getElementById('question-view').style.display = currentView === 'question' ? 'block' : 'none';
             document.getElementById('pause-view').style.display = currentView === 'pause' ? 'flex' : 'none';

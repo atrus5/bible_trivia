@@ -590,8 +590,21 @@ def propresenter_start():
 def handle_connect():
     # Every screen (display, players) starts with the current daily board
     emit('update_leaderboard', get_daily_board())
+
+    # In ProPresenter slide mode, the stage display must not briefly show the
+    # previous question while it waits for its slide_shown event. The event
+    # will either start the next question or re-sync the live one below.
+    is_stage_display = request.args.get('display') == 'stage'
+    if is_stage_display and game["slide_mode"]:
+        if game["paused"]:
+            emit('game_status', {'active': game["active"],
+                                 'paused': True,
+                                 'slide_mode': True})
+        return
+
     if game["active"] and game["question"]:
-        emit('game_status', {'active': True, 'paused': game["paused"]})
+        emit('game_status', {'active': True, 'paused': game["paused"],
+                             'slide_mode': game["slide_mode"]})
         emit('new_question', public_question(game["question"]))
         emit('timer_tick', {'time_left': timer_seconds, 'active': timer_running,
                             'total': game.get("timer_seconds", DEFAULT_TIMER),
@@ -608,7 +621,8 @@ def handle_connect():
     else:
         emit('game_status', {'active': False,
                              'message': 'The game is starting soon...',
-                             'paused': game["paused"]})
+                             'paused': game["paused"],
+                             'slide_mode': game["slide_mode"]})
 
 # ------------------------------------------------------------------
 # ProPresenter slide mode: exactly one question per slide appearance
@@ -624,7 +638,14 @@ def handle_slide_shown(_data=None):
     if not game.get("slide_mode") or game["paused"]:
         return
     if game["active"] and game["question"] and not game["revealed"]:
-        return  # a live unrevealed question is on screen — just resync
+        # The display may have connected while this question was already live.
+        # Re-sync it now that ProPresenter has actually shown the slide.
+        emit('game_status', {'active': True, 'paused': False, 'slide_mode': True})
+        emit('new_question', public_question(game["question"]))
+        emit('timer_tick', {'time_left': timer_seconds, 'active': timer_running,
+                            'total': game.get("timer_seconds", DEFAULT_TIMER),
+                            'paused': False})
+        return  # a live unrevealed question is on screen — do not advance
     now = time.time()
     if now - _last_slide_start < 3:
         return  # debounce duplicate show events (connect + visibilitychange)
