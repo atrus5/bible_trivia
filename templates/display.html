@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="/static/style.css">
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         /* Big-screen tweaks for ProPresenter output.
            Sizes use vw/clamp so everything fits on any projector — nothing
@@ -108,21 +109,54 @@
             justify-content: center;
             min-height: 88vh;
             text-align: center;
-        }
-        #pause-view .pause-title { font-size: clamp(48px, 5vw, 96px); font-weight: 800; }
+        }        #pause-view .pause-title { font-size: clamp(48px, 5vw, 96px); font-weight: 800; }
         #pause-view .pause-sub {
             font-size: clamp(24px, 2.2vw, 40px);
             color: var(--gold-2);
             font-weight: 700;
             margin-top: 2vh;
         }
+        /* Join intro: QR code shows first (5s) when the display page loads,
+           then hands over to the normal pregame message. */
+        #qr-intro {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        #qr-intro h1 {
+            margin: 0 0 2.2vh;
+            font-size: clamp(28px, 3vw, 56px);
+            font-weight: 800;
+        }
+        #qr-card {
+            display: inline-block;
+            background: #fff;
+            padding: clamp(10px, 1.6vh, 20px);
+            border-radius: 20px;
+            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.45);
+        }
+        #qr-card img { display: block; width: min(44vh, 42vw); height: auto; }
+        #qr-url {
+            margin-top: 2vh;
+            font-size: clamp(18px, 1.9vw, 36px);
+            font-weight: 700;
+            color: var(--gold-2);
+            word-break: break-all;
+        }
     </style>
 </head>
 <body>
     <div id="stage">
         <div id="pregame-view">
-        <div id="status-msg">The game is starting soon... 📖</div>
-    </div>
+            <div id="qr-intro">
+                <h1>📱 Scan to Play Bible Trivia</h1>
+                <div id="qr-card"><div id="qr"></div></div>
+                <div id="qr-url">{{ join_url }}</div>
+            </div>
+            <div id="status-msg" style="display: none;">The game is starting soon... 📖</div>
+        </div>
 
         <div id="pause-view">
             <div class="pause-title">⏸️ Game Paused</div>
@@ -170,6 +204,60 @@
         let currentView = 'pregame';
         let viewBeforePause = 'pregame';
 
+        // --- QR join intro (slide mode): QR for ~5s, then the question. ---
+        let qrTimer = null;          // pending handover from QR intro to question
+        let pendingQuestion = null;  // question waiting for the intro to end
+        new QRCode(document.getElementById('qr'), {
+            text: {{ join_url | tojson }},
+            width: 1024,
+            height: 1024,
+            colorDark: '#0f1220',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.M
+        });
+
+        function showQrIntro() {
+            currentView = 'pregame';
+            document.getElementById('qr-intro').style.display = 'flex';
+            document.getElementById('status-msg').style.display = 'none';
+            renderView();
+        }
+
+        function showStatusMsg() {
+            document.getElementById('qr-intro').style.display = 'none';
+            document.getElementById('status-msg').style.display = 'block';
+        }
+
+        function endQrIntroNow() {
+            if (qrTimer) { clearTimeout(qrTimer); qrTimer = null; }
+            if (pendingQuestion) {
+                const q = pendingQuestion;
+                pendingQuestion = null;
+                renderQuestion(q);
+            }
+        }
+
+        function renderQuestion(q) {
+            showQuestionView();
+            document.getElementById('question').innerText = q.question;
+            document.getElementById('reveal-ref').innerText = '';
+            document.getElementById('q-type').innerText =
+                (q.type_label && q.type_label !== 'Mixed') ? q.type_label : '';
+            const pill = document.getElementById('q-difficulty');
+            pill.className = 'pill ' + q.difficulty;
+            pill.innerText = q.difficulty.toUpperCase();
+
+            const grid = document.getElementById('options');
+            grid.innerHTML = '';
+            q.options.forEach((opt, i) => {
+                const el = document.createElement('div');
+                el.className = 'option';
+                el.dataset.text = opt;
+                el.innerHTML = '<span class="key">' + 'ABCD'[i] + '</span>' + opt;
+                grid.appendChild(el);
+            });
+        }
+
         function renderView() {
             document.getElementById('stage').style.visibility = 'visible';
             document.getElementById('leader-strip').style.visibility = 'visible';
@@ -210,31 +298,30 @@
                 return;
             }
             if (!status.active) {
+                // While the QR intro is up, don't tear it down — the question
+                // that triggered it is about to appear.
+                if (qrTimer || pendingQuestion) return;
                 document.getElementById('status-msg').innerText =
                     (status.message || 'The game is starting soon...') + ' 📖';
                 showPregame();
+                showStatusMsg();
             }
         });
 
         socket.on('new_question', (q) => {
-            showQuestionView();
-            document.getElementById('question').innerText = q.question;
-            document.getElementById('reveal-ref').innerText = '';
-            document.getElementById('q-type').innerText =
-                (q.type_label && q.type_label !== 'Mixed') ? q.type_label : '';
-            const pill = document.getElementById('q-difficulty');
-            pill.className = 'pill ' + q.difficulty;
-            pill.innerText = q.difficulty.toUpperCase();
-
-            const grid = document.getElementById('options');
-            grid.innerHTML = '';
-            q.options.forEach((opt, i) => {
-                const el = document.createElement('div');
-                el.className = 'option';
-                el.dataset.text = opt;
-                el.innerHTML = '<span class="key">' + 'ABCD'[i] + '</span>' + opt;
-                grid.appendChild(el);
-            });
+            if (q.qr_intro) {
+                // Slide mode: show the join QR screen, hold the question until
+                // the intro ends (the server sends the question again to all
+                // screens at that moment, and this display swaps instantly).
+                pendingQuestion = q;
+                if (qrTimer) clearTimeout(qrTimer);
+                showQrIntro();
+                qrTimer = setTimeout(endQrIntroNow, q.qr_intro * 1000);
+                return;
+            }
+            if (qrTimer) { clearTimeout(qrTimer); qrTimer = null; }
+            pendingQuestion = null;
+            renderQuestion(q);
         });
 
         socket.on('timer_tick', (data) => {
@@ -294,7 +381,9 @@
             document.getElementById('status-msg').innerHTML =
                 '👑 ' + w.month_label + ' Champion<br><span style="font-size:64px; color: var(--gold-2);">' +
                 w.name + '</span><br><span class="muted" style="font-size:26px;">' + w.points + ' points</span>';
+            qrTimer = null; pendingQuestion = null;
             showPregame();
+            showStatusMsg();
         });
     </script>
 </body>

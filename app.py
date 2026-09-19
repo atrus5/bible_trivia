@@ -48,6 +48,7 @@ if ADMIN_PIN is None:
 JOIN_URL = os.environ.get('PUBLIC_JOIN_URL', 'https://bible-trivia-3jke.onrender.com/')
 DEFAULT_TIMER = 15
 DEFAULT_PAUSE = 10         # auto-play: seconds between reveal and next question
+SLIDE_QR_INTRO = 5         # slide mode: seconds of QR join screen before each question
 DIFFICULTIES = ('easy', 'medium', 'hard')
 
 # ------------------------------------------------------------------
@@ -499,7 +500,10 @@ def set_paused(value):
     push_admin_state()
     save_state()
 
-def start_next_question():
+def start_next_question(qr_intro=0, intro_sid=None):
+    """Start a question. With qr_intro > 0 (slide mode) the stage display first
+    shows the join QR screen: only that display gets the early event, and the
+    question + timer go out to everyone when the intro ends."""
     q = pick_question(game["difficulty"])
     if not q:
         return
@@ -510,10 +514,24 @@ def start_next_question():
     game["paused"] = False
     answered[q["id"]] = set()
     socketio.emit('game_status', {'active': True, 'paused': game["paused"]})
-    socketio.emit('new_question', public_question(q))
-    start_timer()
+    if qr_intro > 0 and intro_sid:
+        # Slide mode: keep the question off phones until the QR intro is over.
+        socketio.emit('new_question',
+                      dict(public_question(q), qr_intro=qr_intro), to=intro_sid)
+        socketio.start_background_task(_delayed_question_broadcast, qr_intro)
+    else:
+        socketio.emit('new_question', public_question(q))
+        start_timer()
     push_admin_state()
     save_state()
+
+def _delayed_question_broadcast(secs):
+    """After the QR intro: send the question to every screen and start the clock."""
+    socketio.sleep(secs)
+    if game["active"] and game["question"] and not game["revealed"]:
+        socketio.emit('new_question', public_question(game["question"]))
+        start_timer()
+        push_admin_state()
 
 # ------------------------------------------------------------------
 # State persistence (settings + live game survive restarts)
@@ -727,7 +745,7 @@ def handle_slide_shown(_data=None):
     if now - _last_slide_start < 3:
         return  # debounce duplicate show events (connect + visibilitychange)
     _last_slide_start = now
-    start_next_question()
+    start_next_question(SLIDE_QR_INTRO, request.sid)
 
 # ------------------------------------------------------------------
 # Player events
