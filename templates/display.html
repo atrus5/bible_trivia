@@ -21,9 +21,19 @@
             justify-content: center;
             min-height: 88vh;
         }
-        #q-difficulty { margin-bottom: 1.4vh; font-size: clamp(14px, 1.1vw, 20px); }
+        #q-type {
+            font-size: clamp(20px, 1.8vw, 34px);
+            font-weight: 800;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--gold-2);
+            margin-bottom: 1.2vh;
+            text-shadow: 0 3px 18px rgba(0, 0, 0, 0.5);
+        }
+        #q-type:empty { display: none; }
+        #q-difficulty { margin-bottom: 1.4vh; font-size: clamp(15px, 1.3vw, 24px); }
         #question {
-            font-size: clamp(40px, 3.6vw, 68px);
+            font-size: clamp(46px, 4.2vw, 80px);
             font-weight: 800;
             line-height: 1.18;
             margin-bottom: 2.6vh;
@@ -35,24 +45,27 @@
             gap: 1.6vh 22px;
         }
         .option {
-            font-size: clamp(20px, 1.8vw, 34px);
-            padding: 1.6vh 2vw;
+            font-size: clamp(28px, 2.6vw, 48px);
+            font-weight: 700;
+            padding: 2vh 2.2vw;
             border-radius: 16px;
+            align-items: center;
         }
         .option .key {
-            width: clamp(30px, 2.4vw, 46px);
-            height: clamp(30px, 2.4vw, 46px);
-            font-size: clamp(16px, 1.2vw, 22px);
-            border-radius: 12px;
-            margin-right: 0.9vw;
+            width: clamp(40px, 3.2vw, 62px);
+            height: clamp(40px, 3.2vw, 62px);
+            font-size: clamp(22px, 1.8vw, 34px);
+            border-radius: 14px;
+            margin-right: 1.1vw;
+            flex-shrink: 0;
         }
         #big-timer { font-size: clamp(44px, 4vw, 76px); font-weight: 800; }
         #big-timer.warn { color: var(--red); }
         #reveal-ref {
             display: inline-block;
             margin-top: 2.4vh;
-            padding: 1.2vh 2.4vw;
-            font-size: clamp(18px, 1.7vw, 32px);
+            padding: 1.4vh 2.6vw;
+            font-size: clamp(24px, 2.2vw, 42px);
             font-weight: 700;
             color: var(--gold-2);
             background: rgba(245, 185, 66, 0.12);
@@ -120,6 +133,7 @@
                 <div class="timer-bar" style="height: 14px;"><div class="timer-fill" id="timer-fill"></div></div>
                 <div id="big-timer">15</div>
             </div>
+            <div id="q-type"></div>
             <div><span class="pill" id="q-difficulty"></span></div>
             <div id="question">Loading...</div>
             <div class="option-grid" id="options"></div>
@@ -205,6 +219,8 @@
             showQuestionView();
             document.getElementById('question').innerText = q.question;
             document.getElementById('reveal-ref').innerText = '';
+            document.getElementById('q-type').innerText =
+                (q.type_label && q.type_label !== 'Mixed') ? q.type_label : '';
             const pill = document.getElementById('q-difficulty');
             pill.className = 'pill ' + q.difficulty;
             pill.innerText = q.difficulty.toUpperCase();

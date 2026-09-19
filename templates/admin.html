@@ -100,6 +100,15 @@
                     </div>
                 </div>
                 <div class="controls">
+                    <div class="seg">
+                        <span class="seg-label">Question type</span>
+                        <select id="type-select" onchange="setType(this.value)" style="min-width: 230px;
+                            font-size: 15px; padding: 10px 12px;">
+                            <option value="mixed">🎲 Mixed — everything</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="controls">
                     <div class="seg" id="timer-seg">
                         <span class="seg-label">Timer</span>
                         <button class="btn ghost" data-sec="15" onclick="setTimer(15)">15s</button>
@@ -122,7 +131,7 @@
 
             <div class="card">
                 <h2>Question Pool — <span id="month-label"></span></h2>
-                <p class="muted">Questions never repeat within the calendar month. Randomly picked per difficulty.</p>
+                <p class="muted">Questions never repeat within the calendar month. Randomly picked per difficulty. Question counts update for the selected type.</p>
                 <div class="usage" id="usage"></div>
             </div>
 
@@ -203,6 +212,16 @@
 
         socket.on('admin_state', (s) => {
             if (!authed) return;
+            // Question-type dropdown: rebuild only when the category list changes
+            const sel = document.getElementById('type-select');
+            if (sel.dataset.signature !== (s.type_options || []).join('|')) {
+                sel.dataset.signature = (s.type_options || []).join('|');
+                sel.innerHTML = '<option value="mixed">🎲 Mixed — everything</option>' +
+                    (s.type_options || []).map(t =>
+                        '<option value="' + t.id + '">' + t.label + '</option>').join('');
+            }
+            sel.value = s.question_type || 'mixed';
+            if (sel.value !== (s.question_type || 'mixed')) sel.value = 'mixed';
             document.getElementById('player-count').innerText = s.player_count;
             document.getElementById('answered-count').innerText = s.answered_count;
 
@@ -254,7 +273,11 @@
 
             const qv = document.getElementById('q-view');
             if (s.question) {
-                qv.innerHTML =
+                const typeTitle = (s.question.type_label && s.question.type_label !== 'Mixed')
+                    ? '<div style="color: var(--gold-2); font-weight: 800; text-transform: uppercase; '
+                      + 'letter-spacing: 1px; font-size: 14px; margin-bottom: 6px;">'
+                      + s.question.type_label + '</div>' : '';
+                qv.innerHTML = typeTitle +
                     '<div class="q-preview">' + s.question.question + '</div>' +
                     '<span class="pill ' + s.question.difficulty + '">' + s.question.difficulty + '</span>' +
                     '<div class="answer-line" style="margin-top: 10px;">Answer: <b>' + s.answer + '</b></div>' +
@@ -273,6 +296,7 @@
         });
 
         function setDifficulty(d) { emitAdmin('admin_set_difficulty', { difficulty: d }); }
+        function setType(t) { emitAdmin('admin_set_question_type', { type: t }); }
         function setTimer(sec) { emitAdmin('admin_set_timer', { seconds: sec }); }
         function setPause(sec) { emitAdmin('admin_set_pause', { seconds: sec }); }
 

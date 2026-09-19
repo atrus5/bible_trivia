@@ -44,8 +44,8 @@ if ADMIN_PIN is None:
           'dashboard is LOCKED until you set it in your hosting dashboard!')
 # URL shown in the stage-display QR code. Set PUBLIC_JOIN_URL in Render to your
 # onrender.com address; the fallback below keeps local testing working.
+# (When the church domain is ready, see README → "Later: AWS + church domain".)
 JOIN_URL = os.environ.get('PUBLIC_JOIN_URL', 'https://bible-trivia-3jke.onrender.com/')
-MULTIPLIER = {'easy': 1, 'medium': 2, 'hard': 3}
 DEFAULT_TIMER = 15
 DEFAULT_PAUSE = 10         # auto-play: seconds between reveal and next question
 DIFFICULTIES = ('easy', 'medium', 'hard')
@@ -68,6 +68,64 @@ def load_questions():
 QUESTIONS = load_questions()
 Q_BY_ID = {q['id']: q for q in QUESTIONS}
 POOL_SIZES = {t: sum(1 for q in QUESTIONS if q['difficulty'] == t) for t in DIFFICULTIES}
+
+# ------------------------------------------------------------------
+# Question types (categories) — derived automatically from each question's
+# scripture reference, so any batch merged later (add_questions.py) is
+# categorized with zero extra work. The admin picks one from a dropdown;
+# "mixed" draws from everything.
+# ------------------------------------------------------------------
+def _ref_book(ref):
+    """Book name from a reference like '1 Samuel 17:45' or 'Genesis 1:1'."""
+    return (ref or '').rsplit(' ', 1)[0].strip().lower().rstrip('.') if ref else ''
+
+_GOSPELS = {'matthew', 'mark', 'luke', 'john'}
+_TORAH = {'genesis', 'exodus', 'leviticus', 'numbers', 'deuteronomy'}
+_OT_HISTORY = {'joshua', 'judges', 'ruth', '1 samuel', '2 samuel', '1 kings',
+               '2 kings', '1 chronicles', '2 chronicles', 'ezra', 'nehemiah', 'esther'}
+_PROPHETS = {'isaiah', 'jeremiah', 'lamentations', 'ezekiel', 'daniel',
+             'hosea', 'joel', 'amos', 'obadiah', 'jonah', 'micah', 'nahum',
+             'habakkuk', 'zephaniah', 'haggai', 'zechariah', 'malachi'}
+_EARLY_CHURCH = {'acts', 'romans', '1 corinthians', '2 corinthians', 'galatians',
+                 'ephesians', 'philippians', 'colossians', '1 thessalonians',
+                 '2 thessalonians', '1 timothy', '2 timothy', 'titus', 'philemon',
+                 'hebrews', 'james', '1 peter', '2 peter', '1 john', '2 john',
+                 '3 john', 'jude'}
+
+def question_category(q):
+    book = _ref_book(q.get('reference'))
+    if book == 'revelation':
+        return 'end-times'
+    if book in _GOSPELS:
+        return 'gospels'
+    if book in _EARLY_CHURCH:
+        return 'early-church'
+    if book in _TORAH:
+        return 'torah'
+    if book in _OT_HISTORY:
+        return 'israel-history'
+    if book in _PROPHETS:
+        return 'prophets'
+    return 'general'
+
+CATEGORIES = [
+    ("mixed",          "🎲 Mixed — everything"),
+    ("gospels",        "✝️ Jesus & the Gospels"),
+    ("early-church",   "⛪ Early Church & Letters"),
+    ("torah",          "📜 Genesis & the Law"),
+    ("israel-history", "🏺 Israel's History"),
+    ("prophets",       "🔥 Prophets & Prophecy"),
+    ("end-times",      "📖 End Times & Revelation"),
+    ("general",        "💡 General Bible Facts"),
+]
+CATEGORY_IDS = {cid for cid, _ in CATEGORIES}
+CATEGORY_LABELS = dict(CATEGORIES)
+
+for _q in QUESTIONS:
+    _q['category'] = question_category(_q)
+
+CATEGORY_POOL_SIZES = {cid: sum(1 for q in QUESTIONS if q['category'] == cid)
+                       for cid in CATEGORY_IDS if cid != 'mixed'}
 
 # ------------------------------------------------------------------
 # Database — SQLite by default (local dev); Postgres when DATABASE_URL
@@ -258,6 +316,7 @@ game = {
     "question": None,          # current question dict
     "revealed": False,
     "difficulty": "mixed",     # easy | medium | hard | mixed
+    "question_type": "mixed",  # category from the admin dropdown; mixed = all
     "timer_seconds": DEFAULT_TIMER,
     "autoplay": True,          # auto-start next question after the reveal pause
     "pause_seconds": DEFAULT_PAUSE,
@@ -335,20 +394,25 @@ def name_in_use(name):
 
 def public_question(q):
     return {"id": q["id"], "question": q["question"], "options": q["options"],
-            "difficulty": q["difficulty"], "total": len(QUESTIONS)}
+            "difficulty": q["difficulty"], "total": len(QUESTIONS),
+            "type_label": CATEGORY_LABELS.get(q.get("category", "general"), "Mixed")}
 
 def pick_question(difficulty):
     """Random question, never repeating within the current calendar month.
-    In 'mixed' mode the difficulty tier itself is chosen at random."""
+    In 'mixed' mode the difficulty tier itself is chosen at random. The
+    selected question type (admin dropdown) narrows the pool by category."""
     month = current_month()
     tiers = list(DIFFICULTIES) if difficulty == "mixed" else [difficulty]
     random.shuffle(tiers)
+    qtype = game.get("question_type", "mixed")
     with db() as conn:
         for tier in tiers:
             used = {r["question_id"] for r in conn.execute(
                 """SELECT question_id FROM used_questions
                    WHERE month=? AND difficulty=?""", (month, tier))}
-            pool = [q for q in QUESTIONS if q["difficulty"] == tier and q["id"] not in used]
+            pool = [q for q in QUESTIONS
+                    if q["difficulty"] == tier and q["id"] not in used
+                    and (qtype == "mixed" or q.get("category") == qtype)]
             if pool:
                 q = random.choice(pool)
                 conn.execute("""INSERT INTO used_questions
@@ -359,7 +423,11 @@ def pick_question(difficulty):
         # Every tier used up this month: clear the month's usage and start over.
         conn.execute("DELETE FROM used_questions WHERE month=?", (month,))
         tier = tiers[0]
-        pool = [q for q in QUESTIONS if q["difficulty"] == tier]
+        pool = [q for q in QUESTIONS
+                if q["difficulty"] == tier
+                and (qtype == "mixed" or q.get("category") == qtype)]
+        if not pool:   # tiny category used up — fall back to the whole tier
+            pool = [q for q in QUESTIONS if q["difficulty"] == tier]
         q = random.choice(pool)
         conn.execute("""INSERT INTO used_questions
             (question_id, difficulty, month, used_at) VALUES (?, ?, ?, ?)
@@ -456,6 +524,7 @@ def save_state():
         "current_question_id": game["question"]["id"] if game["question"] else "",
         "revealed": "1" if game["revealed"] else "0",
         "difficulty": game["difficulty"],
+        "question_type": game["question_type"],
         "timer_seconds": game["timer_seconds"],
         "autoplay": "1" if game["autoplay"] else "0",
         "pause_seconds": game["pause_seconds"],
@@ -465,6 +534,8 @@ def save_state():
 
 def restore_state():
     game["difficulty"] = get_setting("difficulty", "mixed")
+    qtype = get_setting("question_type", "mixed")
+    game["question_type"] = qtype if qtype in CATEGORY_IDS else "mixed"
     game["timer_seconds"] = int(get_setting("timer_seconds", DEFAULT_TIMER))
     game["autoplay"] = get_setting("autoplay", "1") == "1"
     game["pause_seconds"] = int(get_setting("pause_seconds", DEFAULT_PAUSE))
@@ -501,11 +572,17 @@ def push_admin_state():
         "paused": game["paused"],
         "slide_mode": game["slide_mode"],
         "difficulty": game["difficulty"],
+        "question_type": game.get("question_type", "mixed"),
+        "type_options": [{"id": cid, "label": label} for cid, label in CATEGORIES],
         "timer_seconds": game.get("timer_seconds", DEFAULT_TIMER),
         "autoplay": game["autoplay"],
         "pause_seconds": game["pause_seconds"],
         "used": used_this_month(),
-        "pool": POOL_SIZES,
+        "pool": (dict(POOL_SIZES) if game.get("question_type", "mixed") == "mixed"
+                 else {t: sum(1 for x in QUESTIONS
+                              if x["difficulty"] == t
+                              and x.get("category") == game["question_type"])
+                       for t in DIFFICULTIES}),
         "month_label": datetime.now().strftime('%B %Y'),
         "month_winner": get_month_winner(),
         "question": public_question(q) if q else None,
@@ -756,7 +833,7 @@ def handle_answer(data):
 
     selected = data.get('option')
     correct = selected == q["answer"]
-    points = (10 + time_left) * MULTIPLIER.get(q["difficulty"], 1) if correct else 0
+    points = 1 if correct else 0
 
     answered.setdefault(q["id"], set()).add(name)
     save_answer(name, q["id"], correct, points)
@@ -903,6 +980,15 @@ def handle_admin_set_difficulty(data):
     diff = data.get('difficulty')
     if diff in ('easy', 'medium', 'hard', 'mixed'):
         game["difficulty"] = diff
+        save_state()
+        push_admin_state()
+
+@socketio.on('admin_set_question_type')
+@admin_only
+def handle_admin_set_question_type(data):
+    t = data.get('type')
+    if t in CATEGORY_IDS:
+        game["question_type"] = t
         save_state()
         push_admin_state()
 

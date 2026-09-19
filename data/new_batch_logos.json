@@ -1,0 +1,43 @@
+{
+  "easy": [
+    {"question": "How long did Moses' mother hide him as a baby to save his life?", "options": ["3 months", "13 months", "10 months", "7 months"], "answer": "3 months", "reference": "Exodus 2:2"},
+    {"question": "For how long did the flood rain fall?", "options": ["40 days and 40 nights", "80 days and nights", "12 days and nights", "150 days and nights"], "answer": "40 days and 40 nights", "reference": "Genesis 7:12"},
+    {"question": "Who was the first recorded person raised from death to life?", "options": ["The widow of Zarephath's son", "Tabitha", "Lazarus", "The Shunammite woman's son"], "answer": "The widow of Zarephath's son", "reference": "1 Kings 17:21-22"},
+    {"question": "What was the first of the ten plagues in Egypt?", "options": ["Water turned into blood", "Frogs", "Plague of lice", "Darkness"], "answer": "Water turned into blood", "reference": "Exodus 7:20"},
+    {"question": "What was the first miracle performed by Christ?", "options": ["Water turned to wine", "Healing of a blind man", "Feeding the five thousand", "Walking on water"], "answer": "Water turned to wine", "reference": "John 2:1"},
+    {"question": "Who was the first person to come upon the injured man in the parable of the Good Samaritan?", "options": ["A priest", "A Levite", "A Samaritan", "A shepherd"], "answer": "A priest", "reference": "Luke 10:31-32"},
+    {"question": "What was Paul's occupation?", "options": ["Tentmaking", "Carpentry", "Stonemasonry", "Fishing"], "answer": "Tentmaking", "reference": "Acts 18:3"},
+    {"question": "Where was an altar erected \"to the unknown God\"?", "options": ["Athens", "Capernaum", "Thessalonica", "Jericho"], "answer": "Athens", "reference": "Acts 17:22-23"},
+    {"question": "Where was Paul stoned?", "options": ["Lystra", "Melita", "Damascus", "Galilee"], "answer": "Lystra", "reference": "Acts 14:19"},
+    {"question": "How did Paul escape Damascus when enemies tried to kill him?", "options": ["Lowered in a basket through the wall", "An angel carried him out", "He hid in a wagon of hay", "He swam the river"], "answer": "Lowered in a basket through the wall", "reference": "Acts 9:25"},
+    {"question": "To which city did Lot escape when Sodom was destroyed?", "options": ["Zoar", "Golon", "Silo", "Cabul"], "answer": "Zoar", "reference": "Genesis 19:22-23"},
+    {"question": "What tribe of Israel had no inheritance in the promised land?", "options": ["Levi", "Reuben", "Gad", "Manasseh"], "answer": "Levi", "reference": "Deuteronomy 18:1"}
+  ],
+  "medium": [
+    {"question": "How old was Joseph when his brothers sold him into slavery?", "options": ["17", "23", "69", "90"], "answer": "17", "reference": "Genesis 37:2"},
+    {"question": "What are the names of Joseph's two sons?", "options": ["Ephraim and Manasseh", "John and Mark", "Cain and Abel", "Dan and Naphtali"], "answer": "Ephraim and Manasseh", "reference": "Genesis 41:51-52"},
+    {"question": "What was the total number of the children of Israel who went down to Egypt?", "options": ["70", "1000", "53", "560"], "answer": "70", "reference": "Genesis 46:27"},
+    {"question": "How long were the children of Israel in Egypt?", "options": ["430 years", "150 years", "40 years", "666 years"], "answer": "430 years", "reference": "Exodus 12:40-41"},
+    {"question": "How long was the ark that Noah built?", "options": ["300 cubits", "500 cubits", "100 cubits", "250 cubits"], "answer": "300 cubits", "reference": "Genesis 6:15"},
+    {"question": "How many Philistines did Samson slay with a jawbone?", "options": ["1,000", "40", "666", "2,000"], "answer": "1,000", "reference": "Judges 15:15"},
+    {"question": "Who restored Paul's sight after the Lord blinded him?", "options": ["Ananias", "Peter", "Luke", "Matthew"], "answer": "Ananias", "reference": "Acts 9:17-18"},
+    {"question": "Who took Judas' place among the twelve apostles?", "options": ["Matthias", "Stephen", "Jude", "Paul"], "answer": "Matthias", "reference": "Acts 1:23-26"},
+    {"question": "Which apostle first suffered martyrdom?", "options": ["James", "Andrew", "Thomas", "Paul"], "answer": "James", "reference": "Acts 12:2"},
+    {"question": "Which king of Judah was struck with leprosy by God?", "options": ["Uzziah", "Athaliah", "Jehoram", "Amaziah"], "answer": "Uzziah", "reference": "2 Chronicles 26:19"},
+    {"question": "Which book of the Bible never explicitly mentions the name of God?", "options": ["Esther", "Song of Solomon", "Ruth", "Haggai"], "answer": "Esther", "reference": "Esther"},
+    {"question": "Who was the first Christian convert in Europe?", "options": ["Lydia", "Phoebe", "Priscilla", "Salome"], "answer": "Lydia", "reference": "Acts 16:14"}
+  ],
+  "hard": [
+    {"question": "What were Solomon's other names?", "options": ["Jedediah and Lemuel", "Joab and Lemuel", "Jedediah and Joab", "Lemuel and Jeremiah"], "answer": "Jedediah and Lemuel", "reference": "2 Samuel 12:24-25"},
+    {"question": "Which two kings disguised themselves before battle and were both slain by archers?", "options": ["Ahab and Josiah", "Ahab and Zedekiah", "Enosh and Zedekiah", "Japheth and Josiah"], "answer": "Ahab and Josiah", "reference": "1 Kings 22:30-34"},
+    {"question": "Who was the chief of the three mighty men of David?", "options": ["Josheb-basshebeth", "Jonathan", "Benaiah", "Abishai"], "answer": "Josheb-basshebeth", "reference": "2 Samuel 23:8"},
+    {"question": "Which warrior fought so long that his hand stuck to his sword hilt?", "options": ["Eleazar", "Elijah", "Jabez", "Cush"], "answer": "Eleazar", "reference": "2 Samuel 23:9-10"},
+    {"question": "Which prophet was suspended between earth and heaven by a lock of his hair?", "options": ["Ezekiel", "Daniel", "Joel", "Elisha"], "answer": "Ezekiel", "reference": "Ezekiel 8:3"},
+    {"question": "What is the meaning of Jehovah Shammah?", "options": ["The Lord is there", "The Lord is near", "The Lord is with us", "The Lord provides"], "answer": "The Lord is there", "reference": "Ezekiel 48:35"},
+    {"question": "Who was in command of the largest army recorded in the Bible?", "options": ["Asa", "Zedekiah", "Ahab", "Amon"], "answer": "Asa", "reference": "2 Chronicles 14:9"},
+    {"question": "How many cities were given to the Levites for their use?", "options": ["48", "56", "34", "99"], "answer": "48", "reference": "Joshua 21:41"},
+    {"question": "What queen of Bible times is described as \"that wicked woman\"?", "options": ["Athaliah", "Lydia", "Esther", "Jezebel"], "answer": "Athaliah", "reference": "2 Chronicles 24:7"},
+    {"question": "What man, although warned, invited his murderer to a feast?", "options": ["Gedaliah", "Jesse", "Gideon", "Dan"], "answer": "Gedaliah", "reference": "Jeremiah 40:14"},
+    {"question": "Which two men hid in a well to save their lives?", "options": ["Jonathan and Ahimaaz", "Gideon and Phurah", "Saul and Jonathan", "David and Jonathan"], "answer": "Jonathan and Ahimaaz", "reference": "2 Samuel 17:17-19"}
+  ]
+}
