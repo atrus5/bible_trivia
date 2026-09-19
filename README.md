@@ -35,7 +35,13 @@ the reserve can't cover the request, it prints how many are left and writes
 nothing. When the reserve runs low, add more question objects to that file (or
 point `--reserve` at a directory of pool files) and run it again.
 
-The banks currently hold **800 questions** (320 easy / 240 medium / 240 hard).
+The banks currently hold **885 questions** (352 easy / 270 medium / 263 hard).
+
+Every question is also **auto-categorized** for the admin's Question Type dropdown,
+based on the book named in its `reference` (e.g. `Revelation 21:2` → End Times &
+Revelation, `Genesis 3:15` → Genesis & the Law, `Acts 9:25` → Early Church &
+Letters). Keep the book name in the reference and any new batch you merge slots
+into the right category automatically — nothing extra to tag.
 
 To merge a specific hand-written batch instead, use `add_questions.py` with a file
 shaped like this:
@@ -93,6 +99,7 @@ Open `/admin` and enter the admin PIN (set via the `TRIVIA_ADMIN_PIN` environmen
 - 👁️ **Reveal the answer** — the correct option lights up green on every screen, with the verse reference
 - 🤖 Toggle auto-play and set the reveal pause
 - 🎲 Pick difficulty: Mixed / Easy / Medium / Hard (each tier is picked randomly)
+- 📚 Pick a **question type** from the dropdown: 🎲 Mixed (everything), ✝️ Jesus & the Gospels, ⛪ Early Church & Letters, 📜 Genesis & the Law, 🏺 Israel's History, 🔥 Prophets & Prophecy, 📖 End Times & Revelation, or 💡 General Bible Facts — the type is shown as the gold title above each question on every screen
 - ⏱️ Set the timer: 15 / 30 / 45 / 60 seconds
 - 📊 See question-pool usage for the month
 - ⏹️ End the game (scores and used questions are kept)
@@ -130,15 +137,100 @@ Notes:
 - Use the **pooled** connection string from Neon if you hit connection limits.
 - ProPresenter just needs the `https://.../display` URL — the display re-syncs itself whenever the slide reloads.
 
+## Later: Move to AWS + trivia.westportalchurch.ca (planned — not set up yet)
+Everything below is a runbook only. **No AWS account, EC2 instance, or DNS
+change has been made** — the app still runs on Render with Neon.
+
+### 1. Launch the EC2 instance
+1. AWS Console → EC2 → **Launch instance**
+   - AMI: **Ubuntu Server 24.04 LTS**; type: **t2.micro** or **t3.small** (free tier is fine)
+   - Create a key pair and keep the `.pem` file safe
+2. Security group — allow inbound:
+   - SSH (22) from **your IP only**
+   - HTTP (80) and HTTPS (443) from **Anywhere**
+3. Connect: `ssh -i your-key.pem ubuntu@<ec2-public-ip>`
+
+### 2. Install and run the app
+```bash
+sudo apt update && sudo apt install -y python3-venv nginx
+git clone <your-repo-url> trivia && cd trivia
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+```
+Create `/etc/systemd/system/trivia.service`:
+```ini
+[Unit]
+Description=Bible Trivia
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/trivia
+Environment=TRIVIA_ADMIN_PIN=choose-a-pin
+Environment=PUBLIC_JOIN_URL=https://trivia.westportalchurch.ca/
+# No DATABASE_URL on purpose -> uses the local trivia.db (SQLite).
+# It is fast, free, and persists on the EBS disk across reboots.
+ExecStart=/home/ubuntu/trivia/.venv/bin/python app.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+```bash
+sudo systemctl enable --now trivia
+```
+The app listens on port 5000 and creates `trivia.db` automatically — no Neon
+needed on AWS. (Optional: back the file up nightly, e.g. a cron job that copies
+it to S3, so scores can survive even a lost volume.)
+
+### 3. nginx + free HTTPS
+`/etc/nginx/sites-available/trivia`:
+```nginx
+server {
+    listen 80;
+    server_name trivia.westportalchurch.ca;
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;   # required for Socket.IO
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+```bash
+sudo ln -s /etc/nginx/sites-available/trivia /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d trivia.westportalchurch.ca
+```
+
+### 4. Point the domain at AWS
+In the DNS provider that manages `westportalchurch.ca`:
+- Add record: **trivia** → **CNAME** → the EC2 public hostname, **or** an
+  **A** record → the instance IP. (Allocate an **Elastic IP** first so the
+  address never changes when the instance restarts.)
+- Wait for propagation (minutes to a few hours), then open
+  `https://trivia.westportalchurch.ca/` — the QR code on `/display` will
+  already match, via `PUBLIC_JOIN_URL` set in step 2.
+
+### 5. Cutover
+- Try a full practice game on AWS before a Sunday service.
+- Only after that works well: pause or delete the Render service (keep it as a
+  fallback until the first live night on AWS succeeds).
+- If you want the old scores, they stay in Neon — copying Postgres → SQLite is
+  manual, so simplest is a fresh start (crown/copy monthly champions by hand if
+  you care about them).
+
 ## Scoring
-- Base **10 points** + a speed bonus equal to seconds remaining
-- Multiplied by difficulty: easy ×1, medium ×2, hard ×3
+- **1 point** per correct answer — same for every question, any difficulty
 - One answer per player per question
 - **Name protection without lockout** — a name can't be doubled while someone is actively playing under it, but reclaiming your own name later always works (even after a server restart). Sessions are remembered per device, so returning players just reappear.
 - **Reset tools** — per-player reset, **Reset Month** (wipes the month's scores and question usage; crowned champions are kept), and a full Fresh Start in the admin dashboard
 
 ## Question Rules
 - Questions are picked **randomly**, per difficulty tier
+- The admin's selected **question type** narrows the pool to that category; Mixed draws from all 885
 - **No question repeats within a calendar month** (tracked in the DB; survives restarts)
 - If a tier runs out mid-month (e.g., all 240 hard questions used), the picker falls back to the other tiers; the month's usage clears on the 1st
 
