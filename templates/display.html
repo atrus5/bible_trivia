@@ -229,12 +229,10 @@
         }
 
         function endQrIntroNow() {
+            // The server, not this browser timeout, owns the handover. Render
+            // can delay packets, so rendering the pending question here could
+            // put it on screen before the authoritative timer starts.
             if (qrTimer) { clearTimeout(qrTimer); qrTimer = null; }
-            if (pendingQuestion) {
-                const q = pendingQuestion;
-                pendingQuestion = null;
-                renderQuestion(q);
-            }
         }
 
         function renderQuestion(q) {
@@ -266,6 +264,10 @@
             document.getElementById('pause-view').style.display = currentView === 'pause' ? 'flex' : 'none';
             document.getElementById('leader-strip').style.display = currentView === 'question' || currentView === 'pause' ? 'flex' : 'none';
         }
+
+        // Show the QR immediately on page load. Waiting for the first network
+        // event made ProPresenter display a blank stage during Render latency.
+        showQrIntro();
 
         function showPregame() {
             if (currentView === 'pause') { viewBeforePause = 'pregame'; return; }
@@ -322,6 +324,19 @@
             if (qrTimer) { clearTimeout(qrTimer); qrTimer = null; }
             pendingQuestion = null;
             renderQuestion(q);
+            if (q.timer_started_at) {
+                // The question event carries the server's timer start. This
+                // avoids a visible question with a stale/blank timer while a
+                // separate timer_tick packet is still in transit.
+                const total = q.timer_total || 15;
+                const left = Math.max(0, Math.ceil(total - (Date.now() / 1000 - q.timer_started_at)));
+                const num = document.getElementById('big-timer');
+                const fill = document.getElementById('timer-fill');
+                num.innerText = left > 0 ? left : "TIME'S UP!";
+                num.className = left <= 5 && left > 0 ? 'warn' : '';
+                fill.style.width = Math.max(0, (left / total) * 100) + '%';
+                fill.className = 'timer-fill' + (left <= 10 ? ' warn' : '');
+            }
         });
 
         socket.on('timer_tick', (data) => {

@@ -328,6 +328,7 @@ game = {
 answered = {}                 # question_id -> set of names that already answered
 timer_seconds = DEFAULT_TIMER
 timer_running = False
+timer_started_at = None
 state_lock = Lock()
 admins = set()                # sids authenticated as admin
 players = {}                  # sid -> name
@@ -437,12 +438,15 @@ def pick_question(difficulty):
         return q
 
 def start_timer():
-    global timer_seconds, timer_running
+    global timer_seconds, timer_running, timer_started_at
     with state_lock:
         timer_seconds = game.get("timer_seconds", DEFAULT_TIMER)
+        timer_started_at = time.time()
         timer_running = True
     socketio.emit('timer_tick', {'time_left': timer_seconds, 'active': True,
-                                 'total': timer_seconds})
+                                 'total': timer_seconds,
+                                 'started_at': timer_started_at})
+    return timer_started_at
 
 def timer_background_task():
     """Ticks the countdown each second; auto-reveals at zero, then auto-advances
@@ -520,8 +524,10 @@ def start_next_question(qr_intro=0, intro_sid=None):
                       dict(public_question(q), qr_intro=qr_intro), to=intro_sid)
         socketio.start_background_task(_delayed_question_broadcast, qr_intro)
     else:
-        socketio.emit('new_question', public_question(q))
-        start_timer()
+        started_at = start_timer()
+        socketio.emit('new_question', dict(public_question(q),
+                                           timer_started_at=started_at,
+                                           timer_total=game["timer_seconds"]))
     push_admin_state()
     save_state()
 
@@ -529,8 +535,13 @@ def _delayed_question_broadcast(secs):
     """After the QR intro: send the question to every screen and start the clock."""
     socketio.sleep(secs)
     if game["active"] and game["question"] and not game["revealed"]:
-        socketio.emit('new_question', public_question(game["question"]))
-        start_timer()
+        # Start the authoritative timer before announcing the question. The
+        # display can therefore show both together even if Render delays one
+        # Socket.IO packet slightly.
+        started_at = start_timer()
+        socketio.emit('new_question', dict(public_question(game["question"]),
+                                           timer_started_at=started_at,
+                                           timer_total=game["timer_seconds"]))
         push_admin_state()
 
 # ------------------------------------------------------------------
