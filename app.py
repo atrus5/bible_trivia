@@ -228,6 +228,13 @@ def save_answer(name, question_id, correct, points):
             (name, question_id, 1 if correct else 0, points,
              datetime.now().isoformat(timespec='seconds')))
 
+def register_player(name):
+    """Record a participant as soon as they join, even before answering."""
+    with db() as conn:
+        conn.execute("""INSERT INTO players (name, created_at) VALUES (?, ?)
+            ON CONFLICT(name) DO NOTHING""",
+            (name, datetime.now().isoformat(timespec='seconds')))
+
 def board(rows):
     return [{"name": r["name"], "score": r["pts"], "correct": r["c"]} for r in rows]
 
@@ -238,16 +245,20 @@ def get_all_players():
         scored = conn.execute("""SELECT LOWER(name) k, MIN(name) name,
                 SUM(points) pts, COUNT(*) n, MAX(ts) last
             FROM answers GROUP BY LOWER(name)""").fetchall()
-        reserved = {r["k"]: r["name"] for r in conn.execute(
-            "SELECT LOWER(name) k, MIN(name) name FROM players GROUP BY LOWER(name)").fetchall()}
+        reserved = {r["k"]: {"name": r["name"], "joined": r["joined"]}
+                    for r in conn.execute(
+            """SELECT LOWER(name) k, MIN(name) name, MIN(created_at) joined
+               FROM players GROUP BY LOWER(name)""").fetchall()}
     out, seen = [], set()
     for r in scored:
         seen.add(r["k"])
-        out.append({"name": reserved.get(r["k"], r["name"]),
+        participant = reserved.get(r["k"], {"name": r["name"], "joined": ""})
+        out.append({"name": participant["name"],
                     "points": r["pts"], "answers": r["n"], "last": r["last"]})
-    for k, name in reserved.items():
+    for k, participant in reserved.items():
         if k not in seen:  # joined but never answered
-            out.append({"name": name, "points": 0, "answers": 0, "last": ""})
+            out.append({"name": participant["name"], "points": 0, "answers": 0,
+                        "last": participant["joined"] or ""})
     out.sort(key=lambda p: p["last"], reverse=True)
     return out
 
@@ -809,6 +820,7 @@ def handle_login(data):
         if token in player_tokens:
             name = player_tokens[token]
             players[request.sid] = name
+            register_player(name)
             emit('login_ok', {'name': name, 'rejoin_token': token, 'rejoined': True})
             _send_join_context(name)
             return
@@ -824,6 +836,7 @@ def handle_login(data):
             f'"{name}" is playing right now — try another name or add a nickname.'})
         return
     players[request.sid] = name
+    register_player(name)
     new_token = issue_player_token(name)
     emit('login_ok', {'name': name, 'rejoin_token': new_token})
     _send_join_context(name)

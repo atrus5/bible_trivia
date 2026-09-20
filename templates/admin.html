@@ -137,7 +137,7 @@
 
             <div class="card" style="grid-column: 1 / -1;">
                 <h2>Players</h2>
-                <p class="muted">Everyone who has ever played. Reset erases their entire history and frees the name for reuse — good for test entries or name changes.</p>
+                <p class="muted">Everyone who has joined, including participants who have not answered yet. The last column shows their last answer time, or join time if they have not answered. Reset erases their history and frees the name for reuse.</p>
                 <table class="board" id="players-table">
                     <thead><tr><th>Name</th><th>Points</th><th>Answers</th><th>Last Played</th><th></th></tr></thead>
                     <tbody></tbody>
@@ -269,7 +269,7 @@
                 '<td><button class="btn red" data-reset-name="' +
                 p.name.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;') +
                 '">Reset</button></td></tr>'
-            ).join('') || '<tr><td colspan="5" class="muted">No players have scored yet.</td></tr>';
+            ).join('') || '<tr><td colspan="5" class="muted">No players have joined yet.</td></tr>';
 
             const qv = document.getElementById('q-view');
             if (s.question) {
@@ -299,17 +299,6 @@
         function setType(t) { emitAdmin('admin_set_question_type', { type: t }); }
         function setTimer(sec) { emitAdmin('admin_set_timer', { seconds: sec }); }
         function setPause(sec) { emitAdmin('admin_set_pause', { seconds: sec }); }
-
-        // Per-player Reset uses event delegation — an inline onclick with a
-        // JSON-stringified name breaks the HTML attribute on some names.
-        document.querySelector('#players-table tbody').addEventListener('click', (e) => {
-            const btn = e.target.closest('button[data-reset-name]');
-            if (!btn) return;
-            const name = btn.dataset.resetName;
-            if (confirm('Erase all scores for "' + name + '"? This cannot be undone.')) {
-                emitAdmin('admin_reset_player', { name: name });
-            }
-        });
 
         // Per-player Reset uses event delegation (an inline onclick with a JSON
         // name breaks on names containing quotes) — one handler for all rows.
