@@ -97,6 +97,8 @@ def question_category(q):
     book = _ref_book(q.get('reference'))
     if book == 'revelation':
         return 'end-times'
+    if book == 'matthew':
+        return 'matthew'
     if book in _GOSPELS:
         return 'gospels'
     if book in _EARLY_CHURCH:
@@ -112,6 +114,7 @@ def question_category(q):
 CATEGORIES = [
     ("mixed",          "🎲 Mixed — everything"),
     ("gospels",        "✝️ Jesus & the Gospels"),
+    ("matthew",        "📗 Matthew — Advanced"),
     ("early-church",   "⛪ Early Church & Letters"),
     ("torah",          "📜 Genesis & the Law"),
     ("israel-history", "🏺 Israel's History"),
@@ -723,6 +726,8 @@ def handle_connect():
             emit('game_status', {'active': game["active"],
                                  'paused': True,
                                  'slide_mode': True})
+        elif game.get("slide_armed") and not game["active"]:
+            emit('slide_armed')
         return
 
     if game["active"] and game["question"]:
@@ -1017,6 +1022,7 @@ def handle_admin_start(_data):
         # In Slide Mode, Start Game arms the first ProPresenter appearance;
         # it must not start the question before the slide is shown.
         game["slide_armed"] = True
+        socketio.emit('slide_armed')
         save_state()
         push_admin_state()
     elif not (game["active"] and game["question"]):

@@ -35,13 +35,14 @@ the reserve can't cover the request, it prints how many are left and writes
 nothing. When the reserve runs low, add more question objects to that file (or
 point `--reserve` at a directory of pool files) and run it again.
 
-The banks currently hold **885 questions** (352 easy / 270 medium / 263 hard).
+The banks currently hold **935 questions** (352 easy / 270 medium / 313 hard).
 
 Every question is also **auto-categorized** for the admin's Question Type dropdown,
-based on the book named in its `reference` (e.g. `Revelation 21:2` → End Times &
-Revelation, `Genesis 3:15` → Genesis & the Law, `Acts 9:25` → Early Church &
-Letters). Keep the book name in the reference and any new batch you merge slots
-into the right category automatically — nothing extra to tag.
+based on the book named in its `reference` (e.g. `Matthew 28:18` → Matthew —
+Advanced, `Revelation 21:2` → End Times & Revelation, `Genesis 3:15` → Genesis
+& the Law, `Acts 9:25` → Early Church & Letters). Keep the book name in the
+reference and any new batch you merge slots into the right category automatically
+— nothing extra to tag.
 
 To merge a specific hand-written batch instead, use `add_questions.py` with a file
 shaped like this:
@@ -99,7 +100,7 @@ Open `/admin` and enter the admin PIN (set via the `TRIVIA_ADMIN_PIN` environmen
 - 👁️ **Reveal the answer** — the correct option lights up green on every screen, with the verse reference
 - 🤖 Toggle auto-play and set the reveal pause
 - 🎲 Pick difficulty: Mixed / Easy / Medium / Hard (each tier is picked randomly)
-- 📚 Pick a **question type** from the dropdown: 🎲 Mixed (everything), ✝️ Jesus & the Gospels, ⛪ Early Church & Letters, 📜 Genesis & the Law, 🏺 Israel's History, 🔥 Prophets & Prophecy, 📖 End Times & Revelation, or 💡 General Bible Facts — the type is shown as the gold title above each question on every screen
+- 📚 Pick a **question type** from the dropdown: 🎲 Mixed (everything), ✝️ Jesus & the Gospels, 📗 Matthew — Advanced, ⛪ Early Church & Letters, 📜 Genesis & the Law, 🏺 Israel's History, 🔥 Prophets & Prophecy, 📖 End Times & Revelation, or 💡 General Bible Facts — the type is shown as the gold title above each question on every screen
 - ⏱️ Set the timer: 15 / 30 / 45 / 60 seconds
 - 📊 See question-pool usage for the month
 - ⏹️ End the game (scores and used questions are kept)

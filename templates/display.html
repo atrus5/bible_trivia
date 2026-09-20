@@ -302,6 +302,13 @@
             renderView();
         }
 
+        socket.on('slide_armed', () => {
+            // Start Game has been pressed, but the first ProPresenter slide
+            // has not appeared yet. Remove the idle label immediately; the
+            // following slide_shown event owns the five-second QR intro.
+            showQrIntro(false);
+        });
+
         socket.on('game_status', (status) => {
             if (status.paused) {
                 showPauseView();
