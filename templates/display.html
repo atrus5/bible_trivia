@@ -145,6 +145,12 @@
             color: var(--gold-2);
             word-break: break-all;
         }
+        #qr-status {
+            margin-top: 1.2vh;
+            font-size: clamp(24px, 2.4vw, 44px);
+            font-weight: 800;
+            color: var(--gold-2);
+        }
     </style>
 </head>
 <body>
@@ -154,6 +160,7 @@
                 <h1>📱 Scan to Play Bible Trivia</h1>
                 <div id="qr-card"><div id="qr"></div></div>
                 <div id="qr-url">{{ join_url }}</div>
+                <div id="qr-status">Coming Soon</div>
             </div>
             <div id="status-msg" style="display: none;">The game is starting soon... 📖</div>
         </div>
@@ -216,10 +223,11 @@
             correctLevel: QRCode.CorrectLevel.M
         });
 
-        function showQrIntro() {
+        function showQrIntro(waiting = false) {
             currentView = 'pregame';
             document.getElementById('qr-intro').style.display = 'flex';
             document.getElementById('status-msg').style.display = 'none';
+            document.getElementById('qr-status').style.display = waiting ? 'block' : 'none';
             renderView();
         }
 
@@ -267,7 +275,7 @@
 
         // Show the QR immediately on page load. Waiting for the first network
         // event made ProPresenter display a blank stage during Render latency.
-        showQrIntro();
+        showQrIntro(true);
 
         function showPregame() {
             if (currentView === 'pause') { viewBeforePause = 'pregame'; return; }
@@ -303,10 +311,7 @@
                 // While the QR intro is up, don't tear it down — the question
                 // that triggered it is about to appear.
                 if (qrTimer || pendingQuestion) return;
-                document.getElementById('status-msg').innerText =
-                    (status.message || 'The game is starting soon...') + ' 📖';
-                showPregame();
-                showStatusMsg();
+                showQrIntro(true);
             }
         });
 
@@ -317,7 +322,7 @@
                 // screens at that moment, and this display swaps instantly).
                 pendingQuestion = q;
                 if (qrTimer) clearTimeout(qrTimer);
-                showQrIntro();
+                showQrIntro(false);
                 qrTimer = setTimeout(endQrIntroNow, q.qr_intro * 1000);
                 return;
             }

@@ -324,6 +324,8 @@ game = {
     "next_question_at": None,  # wall-clock time when auto-advance should fire
     "paused": False,           # host paused: timer frozen, auto-advance held
     "slide_mode": False,       # ProPresenter mode: one question per slide appearance
+    "slide_armed": False,      # admin pressed Start; first slide may start a question
+    "slide_intro_until": None, # server deadline for the current QR intro
 }
 answered = {}                 # question_id -> set of names that already answered
 timer_seconds = DEFAULT_TIMER
@@ -516,6 +518,8 @@ def start_next_question(qr_intro=0, intro_sid=None):
     game["revealed"] = False
     game["next_question_at"] = None
     game["paused"] = False
+    game["slide_armed"] = False
+    game["slide_intro_until"] = (time.time() + qr_intro) if qr_intro > 0 and intro_sid else None
     answered[q["id"]] = set()
     socketio.emit('game_status', {'active': True, 'paused': game["paused"]})
     if qr_intro > 0 and intro_sid:
@@ -531,18 +535,27 @@ def start_next_question(qr_intro=0, intro_sid=None):
     push_admin_state()
     save_state()
 
+def _finish_slide_intro():
+    """End the current QR intro exactly once and start the authoritative timer."""
+    if not (game["active"] and game["question"] and not game["revealed"]):
+        return
+    if game.get("slide_intro_until") is None:
+        return  # another event already completed this intro
+    game["slide_intro_until"] = None
+    # Start the authoritative timer before announcing the question. The
+    # display can therefore show both together even if Render delays one
+    # Socket.IO packet slightly.
+    started_at = start_timer()
+    socketio.emit('new_question', dict(public_question(game["question"]),
+                                       timer_started_at=started_at,
+                                       timer_total=game["timer_seconds"]))
+    push_admin_state()
+
+
 def _delayed_question_broadcast(secs):
-    """After the QR intro: send the question to every screen and start the clock."""
+    """After the QR intro: send the question and start the clock."""
     socketio.sleep(secs)
-    if game["active"] and game["question"] and not game["revealed"]:
-        # Start the authoritative timer before announcing the question. The
-        # display can therefore show both together even if Render delays one
-        # Socket.IO packet slightly.
-        started_at = start_timer()
-        socketio.emit('new_question', dict(public_question(game["question"]),
-                                           timer_started_at=started_at,
-                                           timer_total=game["timer_seconds"]))
-        push_admin_state()
+    _finish_slide_intro()
 
 # ------------------------------------------------------------------
 # State persistence (settings + live game survive restarts)
@@ -559,6 +572,7 @@ def save_state():
         "pause_seconds": game["pause_seconds"],
         "paused": "1" if game["paused"] else "0",
         "slide_mode": "1" if game["slide_mode"] else "0",
+        "slide_armed": "1" if game.get("slide_armed") else "0",
     })
 
 def restore_state():
@@ -570,6 +584,7 @@ def restore_state():
     game["pause_seconds"] = int(get_setting("pause_seconds", DEFAULT_PAUSE))
     game["paused"] = get_setting("paused", "0") == "1"
     game["slide_mode"] = get_setting("slide_mode", "0") == "1"
+    game["slide_armed"] = get_setting("slide_armed", "0") == "1"
     if get_setting("active", "0") == "1":
         q = Q_BY_ID.get(get_setting("current_question_id", ""))
         if q:
@@ -646,6 +661,8 @@ def reset_game():
     game["revealed"] = False
     game["next_question_at"] = None
     game["paused"] = False
+    game["slide_armed"] = False
+    game["slide_intro_until"] = None
     answered.clear()
     socketio.emit('game_status', {'active': False,
                                   'message': 'The game is starting soon...',
@@ -743,7 +760,24 @@ def handle_slide_shown(_data=None):
     global _last_slide_start
     if not game.get("slide_mode") or game["paused"]:
         return
+    # ProPresenter can load/refresh the slide before the host starts the game.
+    # Do not let that lifecycle event start a game by itself.
+    if not game["active"] and not game.get("slide_armed"):
+        return
     if game["active"] and game["question"] and not game["revealed"]:
+        intro_until = game.get("slide_intro_until")
+        if intro_until is not None:
+            remaining = intro_until - time.time()
+            if remaining > 0:
+                # Duplicate slide events and reconnects during the intro must
+                # stay on the QR screen; never reveal the question early.
+                emit('new_question', dict(public_question(game["question"]),
+                                          qr_intro=max(1, math.ceil(remaining))))
+            else:
+                # The delayed task may be behind due to hosting load. Finish
+                # the intro now rather than showing a question without a timer.
+                _finish_slide_intro()
+            return
         # The display may have connected while this question was already live.
         # Re-sync it now that ProPresenter has actually shown the slide.
         emit('game_status', {'active': True, 'paused': False, 'slide_mode': True})
@@ -979,7 +1013,13 @@ def handle_admin_login(data):
 def handle_admin_start(_data):
     if game["paused"]:
         set_paused(False)
-    if not (game["active"] and game["question"]):
+    if game.get("slide_mode") and not (game["active"] and game["question"]):
+        # In Slide Mode, Start Game arms the first ProPresenter appearance;
+        # it must not start the question before the slide is shown.
+        game["slide_armed"] = True
+        save_state()
+        push_admin_state()
+    elif not (game["active"] and game["question"]):
         start_next_question()
     else:
         push_admin_state()
@@ -1058,6 +1098,12 @@ def handle_admin_toggle_slide_mode(_data):
     game["slide_mode"] = not game["slide_mode"]
     if game["slide_mode"]:
         game["next_question_at"] = None  # suspend the continuous auto-advance
+        if not game["active"]:
+            game["slide_armed"] = False
+    elif game.get("slide_intro_until") is not None:
+        # If Slide Mode is turned off during the QR intro, do not leave the
+        # active question permanently waiting for a slide-only timer.
+        _finish_slide_intro()
     save_state()
     push_admin_state()
 
