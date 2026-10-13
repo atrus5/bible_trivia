@@ -415,6 +415,16 @@ def public_question(q):
             "difficulty": q["difficulty"], "total": len(QUESTIONS),
             "type_label": CATEGORY_LABELS.get(q.get("category", "general"), "Mixed")}
 
+def with_shuffled_options(q):
+    """Copy of a question with its four options in random order, so the
+    correct answer lands on a random letter (A-D) instead of always the first
+    slot — the answer banks store the right option first. Answers are matched
+    by text, so only the display order changes. Shuffled once per question so
+    every screen sees the same order."""
+    opts = list(q["options"])
+    random.shuffle(opts)
+    return {**q, "options": opts}
+
 def pick_question(difficulty):
     """Random question, never repeating within the current calendar month.
     In 'mixed' mode the difficulty tier itself is chosen at random. The
@@ -527,6 +537,7 @@ def start_next_question(qr_intro=0, intro_sid=None):
     q = pick_question(game["difficulty"])
     if not q:
         return
+    q = with_shuffled_options(q)
     game["active"] = True
     game["question"] = q
     game["revealed"] = False
@@ -602,6 +613,7 @@ def restore_state():
     if get_setting("active", "0") == "1":
         q = Q_BY_ID.get(get_setting("current_question_id", ""))
         if q:
+            q = with_shuffled_options(q)
             game["active"] = True
             game["question"] = q
             game["revealed"] = get_setting("revealed", "0") == "1"
