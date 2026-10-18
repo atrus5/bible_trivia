@@ -1,0 +1,29 @@
+{
+  "medium": [
+    {"question": "What does the name Jesus mean, according to the angel?", "options": ["The Lord saves", "God with us", "Prince of peace", "Anointed one"], "answer": "The Lord saves", "reference": "Matthew 1:21"},
+    {"question": "Which prophet did Matthew quote about a virgin conceiving and bearing a son?", "options": ["Isaiah", "Jeremiah", "Micah", "Hosea"], "answer": "Isaiah", "reference": "Matthew 1:22-23"},
+    {"question": "From which direction did the Magi come to Jerusalem?", "options": ["The East", "The North", "The South", "The West"], "answer": "The East", "reference": "Matthew 2:1"},
+    {"question": "Why did the angel tell Joseph to flee with Jesus to Egypt?", "options": ["Herod wanted to kill the child", "A famine was coming", "To register for a census", "To preach in the synagogues"], "answer": "Herod wanted to kill the child", "reference": "Matthew 2:13"},
+    {"question": "Up to what age did Herod order the boys of Bethlehem killed?", "options": ["Two years old", "One year old", "Five years old", "Ten years old"], "answer": "Two years old", "reference": "Matthew 2:16"},
+    {"question": "What did John the Baptist say the coming one would baptize with?", "options": ["The Holy Spirit and fire", "Water and wine", "Oil and myrrh", "Wind and rain"], "answer": "The Holy Spirit and fire", "reference": "Matthew 3:11"},
+    {"question": "Where did the devil take Jesus for the second temptation?", "options": ["The pinnacle of the temple", "A high mountain", "The wilderness", "The seashore"], "answer": "The pinnacle of the temple", "reference": "Matthew 4:5"},
+    {"question": "According to the first Beatitude, whose is the kingdom of heaven?", "options": ["The poor in spirit", "The meek", "The merciful", "The pure in heart"], "answer": "The poor in spirit", "reference": "Matthew 5:3"},
+    {"question": "Which group did Jesus call sons of God in the Beatitudes?", "options": ["The peacemakers", "The mourners", "The persecuted", "The hungry"], "answer": "The peacemakers", "reference": "Matthew 5:9"},
+    {"question": "What did Jesus say to do when someone slaps you on the right cheek?", "options": ["Turn the other cheek also", "Walk away in silence", "Report them to the elders", "Ask them for an apology"], "answer": "Turn the other cheek also", "reference": "Matthew 5:39"},
+    {"question": "Which two masters did Jesus say no one can serve?", "options": ["God and money", "God and Caesar", "Law and grace", "Wisdom and wealth"], "answer": "God and money", "reference": "Matthew 6:24"},
+    {"question": "Jesus warned that false prophets come to you in what?", "options": ["Sheep's clothing", "Fine linen", "Sackcloth", "Royal robes"], "answer": "Sheep's clothing", "reference": "Matthew 7:15"},
+    {"question": "What did Jesus tell the man who wanted to bury his father first?", "options": ["Let the dead bury their own dead", "Go and sell all you have", "Wait until the Sabbath ends", "Follow me after the feast"], "answer": "Let the dead bury their own dead", "reference": "Matthew 8:22"},
+    {"question": "Who did Jesus say need a doctor?", "options": ["The sick", "The righteous", "The rich", "The teachers of the law"], "answer": "The sick", "reference": "Matthew 9:12"},
+    {"question": "Jesus sent his disciples out as wise as what and innocent as what?", "options": ["Serpents and doves", "Owls and lambs", "Foxes and doves", "Eagles and doves"], "answer": "Serpents and doves", "reference": "Matthew 10:16"},
+    {"question": "What did Jesus promise to give all who are weary and burdened?", "options": ["Rest", "Wealth", "Healing", "Wisdom"], "answer": "Rest", "reference": "Matthew 11:28"},
+    {"question": "What did Jesus compare the kingdom of heaven to, hidden in flour?", "options": ["Yeast", "Salt", "Honey", "Oil"], "answer": "Yeast", "reference": "Matthew 13:33"},
+    {"question": "What can a person forfeit by gaining the whole world?", "options": ["Their soul", "Their family", "Their health", "Their reward"], "answer": "Their soul", "reference": "Matthew 16:26"},
+    {"question": "Where did Jesus say he is present?", "options": ["Where two or three gather in his name", "Only in the temple", "Where the Law is read", "Only among the apostles"], "answer": "Where two or three gather in his name", "reference": "Matthew 18:20"},
+    {"question": "Jesus said the temple should be a house of prayer, but what had they made it?", "options": ["A den of robbers", "A marketplace", "A treasury", "A courtroom"], "answer": "A den of robbers", "reference": "Matthew 21:13"},
+    {"question": "Whose God did Jesus say he is, proving God is God of the living?", "options": ["Abraham, Isaac and Jacob", "Moses, Aaron and Joshua", "David, Solomon and Hezekiah", "Enoch, Noah and Job"], "answer": "Abraham, Isaac and Jacob", "reference": "Matthew 22:32"},
+    {"question": "Who did Jesus say knows the day and hour of his return?", "options": ["No one but the Father", "Only the angels", "Only the prophets", "Everyone who watches"], "answer": "No one but the Father", "reference": "Matthew 24:36"},
+    {"question": "What did Jesus say happens to all who draw the sword?", "options": ["They die by the sword", "They win the battle", "They are exiled", "They lose their reward"], "answer": "They die by the sword", "reference": "Matthew 26:52"},
+    {"question": "What did Jesus cry out from the cross at the ninth hour?", "options": ["My God, my God, why have you forsaken me?", "Father, forgive them", "It is finished", "Into your hands I commit my spirit"], "answer": "My God, my God, why have you forsaken me?", "reference": "Matthew 27:46"},
+    {"question": "What did the risen Jesus tell his disciples to do to all nations?", "options": ["Make disciples", "Send prophets", "Build temples", "Appoint judges"], "answer": "Make disciples", "reference": "Matthew 28:19"}
+  ]
+}

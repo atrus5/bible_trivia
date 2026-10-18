@@ -35,7 +35,7 @@ the reserve can't cover the request, it prints how many are left and writes
 nothing. When the reserve runs low, add more question objects to that file (or
 point `--reserve` at a directory of pool files) and run it again.
 
-The banks currently hold **935 questions** (352 easy / 270 medium / 313 hard).
+The banks currently hold **960 questions** (352 easy / 295 medium / 313 hard).
 
 Every question is also **auto-categorized** for the admin's Question Type dropdown,
 based on the book named in its `reference` (e.g. `Matthew 28:18` → Matthew —
@@ -231,7 +231,7 @@ In the DNS provider that manages `westportalchurch.ca`:
 
 ## Question Rules
 - Questions are picked **randomly**, per difficulty tier
-- The admin's selected **question type** narrows the pool to that category; Mixed draws from all 885
+- The admin's selected **question type** narrows the pool to that category; Mixed draws from all 960
 - **No question repeats within a calendar month** (tracked in the DB; survives restarts)
 - If a tier runs out mid-month (e.g., all 240 hard questions used), the picker falls back to the other tiers; the month's usage clears on the 1st
 
